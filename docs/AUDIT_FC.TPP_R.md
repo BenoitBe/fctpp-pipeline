@@ -125,7 +125,7 @@ Surtout, à haute température, l'absence d'une protéine dans une condition est
 - Sur les lignes imputées (1 369), l'écart médian est de 0,29 log2 (QRILC contre MinProb).
 - Le seul hit supplémentaire de la version Deimos (Q2FVV0, C2_vs_Ctl, T2–T3) repose sur une température imputée et sur une protéine absente à T1.
 
-*Python.* Drapeau `imputed_in_run` (à partir de `num_NAs` de Deimos) sur chaque hit. Imputation et seed sont gérés par Deimos, et leur homogénéité entre températures est vérifiée.
+*Python.* Drapeau `imputed_in_run` sur chaque hit, à partir de `num_NAs` de Deimos. Ce compte porte sur la protéine toutes conditions confondues ; le drapeau est donc conservateur. Imputation et seed sont gérés par Deimos, et leur homogénéité entre températures est vérifiée.
 
 ### A6. Abondance et stabilité thermique
 

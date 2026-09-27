@@ -123,7 +123,8 @@ Every match is written to `deimos_runs/sample_mapping.csv`.
        so it is expression or solubility rather than stability;
      - `undetermined`: the protein is absent at the reference temperature;
      - `mixed-sign`: `r_legacy` only.
-   - `imputed_in_run`: Deimos imputed at least one value at a temperature of the calling run.
+   - `imputed_in_run`: Deimos imputed at least one value of the protein (in any
+     condition) at a temperature of the calling run.
    - `run_start`–`run_end`, `direction`, `n_sig_temps`, `max_abs_diff`, `max_logp`.
    - `over_strict` / `over_r_legacy`: the result of each rule, for comparison.
 

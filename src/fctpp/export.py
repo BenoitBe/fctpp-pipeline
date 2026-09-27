@@ -85,8 +85,8 @@ def methods_table(res: TPPResult, run_info: dict) -> pd.DataFrame:
          f"({res.temperatures.reference}) → 'abundance-like' (difference present without heating; "
          f"expression/solubility rather than thermal stability)"),
         ("Imputation flag", "imputed_in_run",
-         "True when Deimos imputed at least one value of the protein at a temperature of the "
-         "calling run (num_NAs > 0): check the hit on the raw data"),
+         "True when Deimos imputed at least one value of the protein (any condition: Deimos "
+         "num_NAs is per protein) at a temperature of the calling run: check the hit on the raw data"),
         ("Multiple testing", "not controlled across temperatures",
          "Per-temperature p-values are thresholded; the consecutive-temperature rule reduces "
          "but does not calibrate false positives (see README)"),
