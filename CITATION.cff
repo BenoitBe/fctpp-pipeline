@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "FC.TPP: fold-change based Thermal Proteome Profiling (Python)"
+version: 0.1.0
+date-released: 2026-09-27
+license: Artistic-2.0
+repository-code: "https://github.com/BenoitBe/fctpp-pipeline"
+authors:
+  - family-names: Bernay
+    given-names: Benoit
+    email: benoit.bernay@unicaen.fr
+    orcid: "https://orcid.org/0000-0002-3624-1514"
+    affiliation: "Université de Caen Normandie"
+  - family-names: Sleiman
+    given-names: Anthony
+    email: anthony.sleiman@univ-rouen.fr
+  - family-names: Mahé
+    given-names: Alexandre
+    email: alexandre.mahe@unicaen.fr
+    orcid: "https://orcid.org/0009-0005-4487-9015"
+    affiliation: "Université de Caen Normandie"
+  - family-names: Budin-Verneuil
+    given-names: Aurélie
+    email: aurelie.verneuil@unicaen.fr
+keywords:
+  - proteomics
+  - thermal proteome profiling
+  - DIA-NN
+  - mass spectrometry

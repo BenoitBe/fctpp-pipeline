@@ -1,0 +1,13 @@
+# FC.TPP (Python) — pip install -r requirements.txt && pip install -e .
+numpy>=1.23
+pandas>=1.5
+openpyxl>=3.1
+matplotlib>=3.6
+plotly>=5.15
+pyyaml>=6.0
+
+# optional: non-overlapping labels on volcano plots (ggrepel equivalent)
+adjustText>=0.8
+
+# tests
+pytest>=7

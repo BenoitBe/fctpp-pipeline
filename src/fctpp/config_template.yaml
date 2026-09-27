@@ -1,0 +1,87 @@
+# ==============================================================================
+# FC.TPP — fold-change Thermal Proteome Profiling (Python)
+# Annotated configuration. CLI options always override this file.
+#   fctpp all     --config fctpp_config.yaml
+#   fctpp analyze --config fctpp_config.yaml --set call.rule=r_legacy
+# ==============================================================================
+
+# ── 1. Preparation of the Deimos runs (fctpp prepare / run-deimos) ───────────
+prepare:
+  raw_dir: TPP_data                  # one DIA-NN pg_matrix per temperature: T1.tsv ... T12.tsv
+  pattern: "*.tsv"
+  # Design, two accepted formats:
+  #  - template (R FC.TPP style): label;condition;replicate with the labels of ONE
+  #    temperature (Sple.1B...). Other temperatures are matched on the suffix left
+  #    after the common prefix (B, C, ... J), as DEP::make_se did implicitly.
+  #  - long (recommended): temperature;label;condition;replicate, explicit labels.
+  design: TPP_data/experimental_design.xlsx
+  out_dir: deimos_runs               # <out_dir>/<T>/{report.pg_matrix.tsv, ExperimentalDesign.csv, deimos_config.yaml}
+  sample_regex: "(Sple-[^_]+)_"      # same regex as Deimos load_data (keep in sync)
+  match_strategy: auto               # auto | exact | suffix
+  deimos_dir: null                   # path to a clone of deimos-proteomics-pipeline
+  python: null                       # interpreter used for Deimos (null = current one)
+  jobs: 1                            # Deimos runs in parallel
+  timeout: null                      # seconds per temperature
+  skip_existing: false
+  deimos:                            # written to every per-temperature Deimos YAML
+    impute_method: qrilc             # identical at every temperature (avoid 'auto' here)
+    control_condition: Ctl           # force the denominator -> same contrasts everywhere
+    n_iter_robustness: 0
+    seed: 42
+    use_deqms: false
+    fdr_global: false
+    make_dashboard: false
+    make_wgcna: false
+    go_organism: null
+    run_perseverance: false
+    species_split: false
+
+# ── 2. Inputs of the TPP analysis (fctpp analyze) ────────────────────────────
+input:
+  mode: deimos                       # deimos | long-table
+  deimos_root: deimos_runs           # <root>/<T>/.../ProteomicAnalysis_Results.xlsx
+  manifest: null                     # or runs.csv written by 'fctpp prepare'
+  long_table: null                   # long-table mode: CSV/XLSX with Temperature, name, <c>_diff, <c>_p.val
+  long_table_sheet: null
+  temperature_regex: null
+
+# Temperatures in °C (optional, used for axes and ordering). Dict or CSV path.
+temperatures_celsius: null
+#  T1: 37.0
+#  T2: 40.4
+
+# ── 3. Protein filter (R tidy_tpp) ───────────────────────────────────────────
+filter:
+  min_temperatures: 6                # quantified at >= 6 temperatures
+  min_streak: 6                      # ... including >= 6 adjacent temperatures
+
+# ── 4. Thermal-shift call ────────────────────────────────────────────────────
+call:
+  fc_cutoff: 0.6                     # |log2 FC|
+  logp_cutoff: 2.0                   # -log10(p): 2 = p < 0.01
+  p_column: p.val                    # p.val (R behaviour) | p.adj (Deimos BH per contrast)
+  min_consecutive: 2
+  rule: strict                       # strict = adjacent temperatures + same sign
+                                     # r_legacy = exact R behaviour (successive rows, any sign)
+  abundance_check: true              # flag hits already present at the lowest temperature
+
+# ── 5. Figures ───────────────────────────────────────────────────────────────
+plots:
+  volcano: true
+  volcano_layout: grid               # grid = 1 page per contrast | pages = R layout
+  volcano_all_proteins: true
+  volcano_fc_cutoff: null            # null = call.fc_cutoff
+  volcano_logp_cutoff: null
+  profiles: true
+  profiles_view: both                # FC | pval | both
+  profiles_pick: both                # All_prot | Over_th | both
+  plot3d: true
+  plotly_js: embed                   # embed (works offline) | cdn | directory
+  gif: false
+  label_column: Genes                # labels on figures (accession if empty)
+
+# ── 6. Outputs ───────────────────────────────────────────────────────────────
+output:
+  out_dir: fctpp_output
+  excel: FCTPP_Results.xlsx
+  csv: true

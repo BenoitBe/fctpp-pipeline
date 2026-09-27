@@ -1,0 +1,39 @@
+# FC.TPP outputs
+fctpp_output*/
+example_output*/
+deimos_runs/
+example_data/deimos_runs/
+example_data/raw/
+example_data/temperatures.csv
+*_plot3D.html
+*_rotation.gif
+FCTPP_Results*.xlsx
+last_config.yaml
+
+# Real data are not versioned (unpublished)
+TPP_data/
+*.pg_matrix.tsv
+*.pr_matrix.tsv
+
+# R leftovers (if the R package is kept alongside)
+.Rproj.user/
+.Rhistory
+.RData
+.Rdata
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
