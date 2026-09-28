@@ -10,8 +10,8 @@ import pandas as pd
 
 from .config import save_config
 from .export import write_workbook
-from .inputs import discover_deimos_runs, load_deimos_runs, load_long_table, read_manifest
-from .prepare import prepare_deimos_inputs, run_deimos_batch
+from .inputs import (DEFAULT_WORKBOOK_GLOB, discover_deimos_runs, load_deimos_runs,
+                     load_long_table, read_manifest)
 from .temperatures import TemperatureSeries, read_celsius_mapping
 from .tpp import CallParams, FilterParams, TPPResult, run_tpp
 
@@ -20,32 +20,6 @@ log = logging.getLogger(__name__)
 
 def _safe(name: str) -> str:
     return "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in name)
-
-
-def prepare(cfg: dict) -> pd.DataFrame:
-    p = cfg["prepare"]
-    if not p.get("design"):
-        raise ValueError("prepare.design is required (experimental design file)")
-    celsius = read_celsius_mapping(cfg.get("temperatures_celsius"))
-    return prepare_deimos_inputs(
-        p["raw_dir"], p["design"], p["out_dir"], pattern=p.get("pattern", "*.tsv"),
-        sample_regex=p.get("sample_regex"), match_strategy=p.get("match_strategy", "auto"),
-        deimos_params=p.get("deimos"), celsius=celsius)
-
-
-def run_deimos(cfg: dict) -> pd.DataFrame:
-    p = cfg["prepare"]
-    if not p.get("deimos_dir"):
-        raise ValueError("prepare.deimos_dir is required (path to the Deimos repository)")
-    status = run_deimos_batch(Path(p["out_dir"]) / "runs.csv", p["deimos_dir"],
-                              python=p.get("python"), jobs=int(p.get("jobs") or 1),
-                              timeout=p.get("timeout"), skip_existing=bool(p.get("skip_existing")))
-    status.to_csv(Path(p["out_dir"]) / "runs_status.csv", index=False)
-    bad = status[~status["status"].astype(str).str.startswith(("ok", "skipped"))]
-    if len(bad):
-        raise RuntimeError(f"Deimos failed for {bad['temperature'].tolist()} "
-                           f"(logs: {bad['log'].tolist()})")
-    return status
 
 
 def load_inputs(cfg: dict):
@@ -58,7 +32,8 @@ def load_inputs(cfg: dict):
             celsius = celsius or cel2
             source = str(i["manifest"])
         else:
-            runs = discover_deimos_runs(i["deimos_root"], i.get("temperature_regex"))
+            runs = discover_deimos_runs(i["deimos_root"], i.get("temperature_regex"),
+                                        i.get("workbook_glob") or DEFAULT_WORKBOOK_GLOB)
             source = str(i["deimos_root"])
         loaded = load_deimos_runs(runs)
     elif mode == "long-table":
@@ -85,7 +60,7 @@ def analyze(cfg: dict) -> dict:
     f, c = cfg["filter"], cfg["call"]
     res: TPPResult = run_tpp(
         loaded.results, temps,
-        FilterParams(int(f["min_temperatures"]), int(f["min_streak"])),
+        FilterParams(float(f["min_temperatures"]), float(f["min_streak"])),
         CallParams(fc_cutoff=float(c["fc_cutoff"]), logp_cutoff=float(c["logp_cutoff"]),
                    p_column=str(c["p_column"]), min_consecutive=int(c["min_consecutive"]),
                    rule=str(c["rule"]), abundance_check=bool(c.get("abundance_check", True))),

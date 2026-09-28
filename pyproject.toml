@@ -54,6 +54,6 @@ testpaths = ["tests"]
 addopts = "-q --strict-markers"
 markers = [
   "realdata: needs the FC.TPP R project folder (set FCTPP_R_PROJECT)",
-  "deimos: needs a Deimos clone (set FCTPP_DEIMOS_DIR); slow",
+  "deimos: needs real Deimos result workbooks (set FCTPP_DEIMOS_RESULTS); slow",
 ]
 filterwarnings = ["ignore::DeprecationWarning"]

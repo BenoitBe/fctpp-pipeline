@@ -145,3 +145,32 @@ def test_presence_stats_uses_series_adjacency():
     df = pd.DataFrame({"Temperature": ["T3", "T5"], "name": ["A", "A"]})
     st = presence_stats(df, temps)
     assert st.loc[0, "max_consecutive"] == 2        # T3 and T5 are adjacent in this series
+
+
+# --------------------------------------------------------------------------- temperatures / X
+
+def test_natural_sort_and_celsius_order():
+    from fctpp.temperatures import natural_sorted
+    assert natural_sorted(["T10", "T2", "T1", "T12"]) == ["T1", "T2", "T10", "T12"]
+    ts = TemperatureSeries.from_ids(["a", "b", "c"], {"a": 50, "b": 37, "c": 44})
+    assert ts.ids == ("b", "c", "a") and ts.reference == "b"
+    with pytest.raises(ValueError):
+        TemperatureSeries.from_ids(["a", "b"], {"a": 37})
+
+
+def test_filter_resolves_against_number_of_temperatures():
+    assert FilterParams(6, 6).resolve(12) == (6, 6)
+    assert FilterParams(0.5, 0.5).resolve(12) == (6, 6)
+    assert FilterParams(0.5, 0.4).resolve(7) == (4, 3)      # rounded up
+    with pytest.raises(ValueError, match="impossible with 5 temperatures"):
+        FilterParams(6, 6).resolve(5)
+
+
+def test_run_tpp_with_fewer_temperatures(loaded):
+    """X = 8 temperatures: fractions keep the R proportion (6/12)."""
+    sub = loaded.results[loaded.results["Temperature"].isin([f"T{i}" for i in range(3, 11)])]
+    res = run_tpp(sub, filter_params=FilterParams(0.5, 0.5), contrasts=loaded.contrasts)
+    assert len(res.temperatures) == 8 and res.temperatures.reference == "T3"
+    assert {"P0001", "P0006"} <= set(res.hits["name"])
+    with pytest.raises(ValueError, match="impossible"):
+        run_tpp(sub[sub["Temperature"].isin(["T3", "T4"])], contrasts=loaded.contrasts)

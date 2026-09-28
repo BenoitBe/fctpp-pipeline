@@ -5,21 +5,18 @@ per-temperature fold changes and p-values: a protein is a hit when it passes
 |log2FC| and p-value thresholds at **several adjacent temperatures** with the same
 direction.
 
-The per-temperature statistics (filtering, imputation, limma/eBayes) are **no longer
-computed in this package**. They come from
-[Deimos](https://github.com/BenoitBe/deimos-proteomics-pipeline), run once per
-temperature, so the platform keeps a single statistical engine. FC.TPP only
-contains the TPP-specific layer.
+FC.TPP starts from the **X result workbooks produced by
+[Deimos](https://github.com/BenoitBe/deimos-proteomics-pipeline)**, one Deimos run
+per temperature point (X = number of temperatures, any value). Deimos does the
+per-temperature statistics (filtering, imputation, limma/eBayes); FC.TPP only
+contains the TPP layer, so the platform keeps a single statistical engine.
 
 ```
-T1.tsv … T12.tsv (DIA-NN)        fctpp prepare        deimos_runs/T1 … T12/
-+ experimental design     ───────────────────────▶  pg_matrix (Deimos layout) + design + YAML
-                                                              │  fctpp run-deimos (Deimos × 12)
-                                                              ▼
-                                                     ProteomicAnalysis_Results.xlsx × 12
-                                                              │  fctpp analyze
-                                                              ▼
-                             FCTPP_Results.xlsx · volcano_plots.pdf · TPP_plots.pdf · *_plot3D.html
+Deimos × X (one run per temperature, run as usual)
+   T1/ProteomicAnalysis_Results.xlsx … TX/ProteomicAnalysis_Results.xlsx
+                         │  fctpp analyze
+                         ▼
+   FCTPP_Results.xlsx · volcano_plots.pdf · TPP_plots.pdf · <contrast>_plot3D.html
 ```
 
 ---
@@ -33,75 +30,58 @@ pip install -e .            # or: pip install -r requirements.txt && pip install
 pip install adjustText      # optional: non-overlapping labels on volcano plots
 ```
 
-Deimos is needed for the `run-deimos` step only (Python ≥ 3.10; tested with Deimos
-commit `4d49d24`):
-
-```bash
-git clone https://github.com/BenoitBe/deimos-proteomics-pipeline.git
-pip install -r deimos-proteomics-pipeline/requirements.txt
-```
+Python ≥ 3.10. Deimos is not a dependency: only its result workbooks are read
+(tested with Deimos commit `4d49d24`).
 
 ---
 
 ## Quick start
 
 ```bash
-fctpp init-config -o fctpp_config.yaml       # annotated template, edit the paths
-
-# 1. one Deimos input set per temperature
-fctpp prepare --raw-dir TPP_data --design TPP_data/experimental_design.xlsx --runs deimos_runs
-
-# 2. run Deimos on every temperature (≈ 30 s each; --jobs to parallelise)
-fctpp run-deimos --runs deimos_runs --deimos-dir ../deimos-proteomics-pipeline --jobs 2
-
-# 3. TPP calls, Excel report and figures
-fctpp analyze --deimos-root deimos_runs -o fctpp_output
-
-# or everything at once
-fctpp all -c fctpp_config.yaml
+fctpp analyze --deimos-root deimos_results -o fctpp_output
+fctpp analyze --deimos-root deimos_results --celsius temperatures.csv -o fctpp_output
+fctpp init-config -o fctpp_config.yaml && fctpp analyze -c fctpp_config.yaml   # YAML
 ```
-
-If the Deimos runs already exist (run by hand, other settings…), step 3 is enough:
-`fctpp analyze` looks for `<root>/<temperature>/**/ProteomicAnalysis_Results.xlsx`.
-A manifest (`--manifest runs.csv`: `temperature,results_path[,temperature_c]`)
-works too.
 
 Try it without data:
 
 ```bash
 python example_data/make_synthetic.py            # 12 Deimos-like workbooks with planted shifts
-fctpp analyze --deimos-root example_data/deimos_runs --celsius example_data/temperatures.csv -o example_output
+fctpp analyze --deimos-root example_data/deimos_results --celsius example_data/temperatures.csv -o example_output
 ```
 
 ---
 
 ## Inputs
 
-| File | Description |
-|---|---|
-| `TPP_data/T1.tsv … Tn.tsv` | One DIA-NN `pg_matrix` per temperature. Old exports (4 annotation columns) and DIA-NN ≥ 2 (6 columns) are both accepted. |
-| Design (`.xlsx` / `.csv`) | `label;condition;replicate`, see below. |
-| Temperatures in °C (optional) | `temperature,celsius` CSV or a dict in the YAML. Used for ordering and axes. |
+**The X Deimos result workbooks.** One `ProteomicAnalysis_Results.xlsx` per
+temperature, found under `--deimos-root`:
 
-**Design, two formats**
+```
+deimos_results/T1/ProteomicAnalysis_Results.xlsx                  # Deimos out_dir = one folder per temperature
+deimos_results/T1/proteomics_output/ProteomicAnalysis_Results.xlsx
+deimos_results/T1_ProteomicAnalysis_Results.xlsx                  # renamed copies in one folder
+```
 
-- *Template* (R FC.TPP format): the labels of **one** temperature (`Sple.1B`, `Sple.1C`…).
-  The other temperatures are matched on the suffix that remains after removing the
-  longest common prefix (`B`, `C`… `J`). This is what `DEP::make_se()` did silently in R.
-  The match must be one-to-one, otherwise the run stops.
-- *Long* (recommended): a `temperature` column plus explicit labels for every
-  temperature.
+- **Temperature id.** It is taken from the first folder under the root (or from
+  the file name). For other names, `--temperature-regex '(T\d+)'` takes it from the
+  path, e.g. `TPP_T3_output/...` gives `T3`. A manifest also works:
+  `--manifest runs.csv`, with columns `temperature,results_path[,temperature_c]`.
+- **What is read.** From each workbook, the `Differential_Expression` sheet: `name`,
+  `Genes`, `num_NAs`, and `<contrast>_diff`, `_p.val`, `_p.adj` for every contrast.
+  The `Methods` sheet is read as well.
+- **Order and temperature values.** Temperatures are ordered naturally (T1 < T2 < …
+  < T10). You can also give their values in °C (`--celsius`, CSV
+  `temperature,celsius`); they are then used for ordering and axes.
 
-Every match is written to `deimos_runs/sample_mapping.csv`.
+**Checklist for the X Deimos runs** (checked by FC.TPP, with a warning if not met):
 
-`fctpp prepare` also:
-- rewrites each matrix in the 6-annotation-column layout that Deimos expects (Deimos
-  reads `columns[:6]` as annotations, so an old 4-column export would lose two runs);
-- writes per-temperature designs with the exact labels Deimos derives from the run
-  names (`(Sple-[^_]+)_`), in the same order at every temperature;
-- writes one Deimos YAML per temperature, with no interactive module and a forced
-  control (`control_condition: Ctl`), so that the contrasts have the same names and
-  orientation at all temperatures.
+| Point | Why | What FC.TPP does |
+|---|---|---|
+| Same condition order and same control at every temperature (e.g. `control_condition: Ctl`) | identical contrast names | a contrast reversed at one temperature is flipped back |
+| Same processing: explicit `impute_method` (not `auto`), same FDR mode | comparable temperatures | differences reported in `Methods` |
+| One design per temperature, with that temperature's labels (`Sple-1B` at T1, `Sple-2B` at T2…) | exact label matching in Deimos | — |
+| DIA-NN matrices with **6 annotation columns** (DIA-NN ≥ 2) | Deimos reads `columns[:6]` as annotations; an old export with 4 columns makes Deimos stop, reporting two samples as missing | — |
 
 ---
 
@@ -109,6 +89,9 @@ Every match is written to `deimos_runs/sample_mapping.csv`.
 
 1. **Presence filter**: `nb_temp ≥ 6` temperatures where Deimos kept the protein, and
    `max_consecutive ≥ 6` adjacent temperatures (R `tidy_tpp`, same defaults).
+   These defaults were set for 12 points. With another X, give numbers
+   (`--min-temperatures 4 --min-streak 4`) or fractions of the series (`0.5` = half,
+   rounded up). A filter larger than X stops the run with an explicit message.
 2. **Per temperature and contrast**: `logpval = -log10(p)`. The p-value is `p.val` by
    default (as in R); `call.p_column: p.adj` switches to the Deimos BH value.
 3. **Call** (`<contrast>_threshold = Over/Under`):
@@ -159,8 +142,8 @@ Consistency checks on the inputs:
 
 | R (FC.TPP) | Python |
 |---|---|
-| `process_tsv`, `format_tsv`, `find_design`, `sumXP` | `fctpp prepare` (`prepare.py`, `design.py`) |
-| `process_and_export` (DEP: filter, MinProb, limma, fdrtool) | **Deimos** (one run per temperature) |
+| `process_tsv`, `format_tsv`, `find_design`, `sumXP`, `process_and_export` (DEP: filter, MinProb, limma, fdrtool) | **Deimos**, one run per temperature (outside this package) |
+| — | `inputs.discover_deimos_runs` / `load_deimos_runs`: reading the X workbooks |
 | `tidy_tpp` | `tpp.run_tpp` (`rule: r_legacy` = identical calls) |
 | `magma` | `plots.volcano_pdf` |
 | `plot_and_3D` (ggplot2, plotly, webshot2, magick) | `plots.profiles_pdf`, `plot3d.plot3d_html`, `plot3d.rotation_gif` |
@@ -190,7 +173,7 @@ On the 12-temperature *S. aureus* dataset of the R project:
 ```bash
 pytest                                        # unit + CLI tests on synthetic data
 FCTPP_R_PROJECT=/path/FC.TPP pytest -m realdata               # parity with the R outputs
-FCTPP_DEIMOS_DIR=/path/deimos FCTPP_R_PROJECT=/path/FC.TPP pytest -m deimos   # real Deimos, slow
+FCTPP_DEIMOS_RESULTS=/path/deimos_results FCTPP_R_PROJECT=/path/FC.TPP pytest -m deimos   # real Deimos outputs
 ```
 
 Real data are not versioned. The two marked suites are skipped when their variables
@@ -205,8 +188,8 @@ are not set.
 - Per-temperature statistics cannot separate abundance from stability. A limma model
   with a temperature × condition interaction, fitted on all temperatures together,
   would. For now the `abundance-like` flag is a heuristic.
-- Deimos' sample regex (`Sple-…_`) is hard-coded on the Deimos side.
-  `prepare.sample_regex` has to stay in sync with it.
+- Deimos side: reading `columns[:6]` as annotations and the `Sple-…_` regex are
+  hard-coded (see the audit).
 
 ---
 

@@ -47,8 +47,30 @@ CALL_RULES = ("strict", "r_legacy")
 
 @dataclass
 class FilterParams:
-    min_temperatures: int = 6   # R: min_temperatures
-    min_streak: int = 6         # R: min_streak
+    """Presence filter. Integers count temperatures (R defaults: 6 and 6, tuned
+    for 12 points); a value < 1 is a fraction of the X temperatures of the
+    series (e.g. 0.5 → half of them, rounded up)."""
+    min_temperatures: float = 6   # R: min_temperatures
+    min_streak: float = 6         # R: min_streak
+
+    @staticmethod
+    def _count(value: float, n: int) -> int:
+        value = float(value)
+        if value < 0:
+            raise ValueError("filter thresholds must be >= 0")
+        return int(np.ceil(value * n)) if 0 < value < 1 else int(value)
+
+    def resolve(self, n_temperatures: int) -> tuple[int, int]:
+        """(min_temperatures, min_streak) in number of temperatures, checked against X."""
+        mt = self._count(self.min_temperatures, n_temperatures)
+        ms = self._count(self.min_streak, n_temperatures)
+        if mt > n_temperatures or ms > n_temperatures:
+            raise ValueError(
+                f"Presence filter impossible with {n_temperatures} temperatures: "
+                f"min_temperatures={mt}, min_streak={ms}. Lower them (e.g. --min-temperatures "
+                f"{max(1, n_temperatures // 2)} --min-streak {max(1, n_temperatures // 2)}) or give "
+                f"fractions (0.5 = half of the series).")
+        return mt, ms
 
 
 @dataclass
@@ -267,14 +289,19 @@ def run_tpp(results: pd.DataFrame, temps: TemperatureSeries | None = None,
     data = data.sort_values(["_pos", "name"], kind="mergesort").reset_index(drop=True)
 
     # --- 1-2. presence statistics & filter -----------------------------------
+    min_t, min_s = fp.resolve(len(temps))
+    if cp.min_consecutive > len(temps):
+        raise ValueError(f"min_consecutive={cp.min_consecutive} > {len(temps)} temperatures")
     stats = presence_stats(data, temps)
-    keep = (stats["max_consecutive"] >= fp.min_streak) & (stats["nb_temp"] >= fp.min_temperatures)
+    keep = (stats["max_consecutive"] >= min_s) & (stats["nb_temp"] >= min_t)
     stats["retained"] = keep.to_numpy()
     kept_names = set(stats.loc[keep, "name"])
     tpp = data[data["name"].isin(kept_names)].copy()
     n_lost = data["name"].nunique() - tpp["name"].nunique()
-    log.info("%d proteins lost after the presence filter (nb_temp >= %d, streak >= %d); %d kept.",
-             n_lost, fp.min_temperatures, fp.min_streak, len(kept_names))
+    log.info("%d temperatures; %d proteins lost after the presence filter (nb_temp >= %d, "
+             "streak >= %d); %d kept.", len(temps), n_lost, min_t, min_s, len(kept_names))
+    if not kept_names:
+        log.warning("No protein passes the presence filter — check filter.min_temperatures / min_streak")
 
     # --- 3. calls -------------------------------------------------------------
     has_nas = "num_NAs" in tpp.columns

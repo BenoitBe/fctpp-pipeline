@@ -57,6 +57,7 @@ def _style_sheet(ws, df: pd.DataFrame, freeze: str | None = "A2") -> None:
 
 def methods_table(res: TPPResult, run_info: dict) -> pd.DataFrame:
     cp, fp = res.call_params, res.filter_params
+    min_t, min_s = fp.resolve(len(res.temperatures))
     rule = ("strict: >= {k} ADJACENT temperatures of the series, all with |log2FC| >= {fc} and "
             "-log10({p}) >= {lp}, with the SAME sign of fold change"
             if cp.rule == "strict" else
@@ -72,7 +73,7 @@ def methods_table(res: TPPResult, run_info: dict) -> pd.DataFrame:
          "(Deimos 'Methods' values per temperature)"),
         ("Temperatures", f"{len(res.temperatures)}", ", ".join(res.temperatures.label(t) for t in res.temperatures)),
         ("Contrasts", f"{len(res.contrasts)}", ", ".join(res.contrasts)),
-        ("Presence filter", f"nb_temp >= {fp.min_temperatures} and max_consecutive >= {fp.min_streak}",
+        ("Presence filter", f"nb_temp >= {min_t} and max_consecutive >= {min_s}",
          "nb_temp = temperatures where the protein passed Deimos' filter; max_consecutive = "
          "longest run of adjacent temperatures"),
         ("Proteins retained", f"{int(res.stats['retained'].sum())} / {len(res.stats)}",

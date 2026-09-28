@@ -1,9 +1,8 @@
 # FC.TPP outputs
 fctpp_output*/
 example_output*/
-deimos_runs/
-example_data/deimos_runs/
-example_data/raw/
+deimos_results/
+example_data/deimos_results/
 example_data/temperatures.csv
 *_plot3D.html
 *_rotation.gif

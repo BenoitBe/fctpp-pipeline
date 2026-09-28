@@ -64,35 +64,68 @@ def _as_bool(v) -> object:
 # Discovery
 # ----------------------------------------------------------------------------
 
-def discover_deimos_runs(root: str | Path, temperature_regex: str | None = None) -> dict[str, Path]:
-    """Find ``ProteomicAnalysis_Results.xlsx`` under ``root``.
+DEFAULT_WORKBOOK_GLOB = "**/*ProteomicAnalysis_Results*.xlsx"
 
-    The temperature id is the first directory under ``root`` on the path to the
-    workbook (layout written by ``fctpp prepare``: ``<root>/<T>/deimos_output/``),
-    or the directory containing the workbook if it sits directly in ``root/<T>``.
+
+def temperature_id(rel_path: Path, temperature_regex: str | None = None) -> str | None:
+    """Temperature identifier of a workbook, from its path relative to the root.
+
+    * with ``temperature_regex``: first capture group (or whole match) searched in
+      the relative path, e.g. ``(T\\d+)`` on ``TPP_T3_output/ProteomicAnalysis_Results.xlsx``
+      gives ``T3``; paths that do not match are skipped (returns None);
+    * otherwise: the first folder under the root (``<root>/T3/.../file.xlsx`` → ``T3``),
+      or the file name without the Deimos suffix for a flat folder
+      (``T3_ProteomicAnalysis_Results.xlsx`` → ``T3``).
+    """
+    rel = rel_path.as_posix()
+    if temperature_regex:
+        m = re.search(temperature_regex, rel)
+        if not m:
+            return None
+        return m.group(1) if m.groups() else m.group(0)
+    if len(rel_path.parts) > 1:
+        return rel_path.parts[0]
+    stem = re.sub(r"[_\-. ]*ProteomicAnalysis_Results[_\-. ]*", "", rel_path.stem)
+    return stem or None
+
+
+def discover_deimos_runs(root: str | Path, temperature_regex: str | None = None,
+                         pattern: str = DEFAULT_WORKBOOK_GLOB) -> dict[str, Path]:
+    """Find the X Deimos result workbooks (one per temperature) under ``root``.
+
+    Accepted layouts (any number of temperatures)::
+
+        root/T1/ProteomicAnalysis_Results.xlsx            (Deimos out_dir per temperature)
+        root/T1/proteomics_output/ProteomicAnalysis_Results.xlsx
+        root/T1_ProteomicAnalysis_Results.xlsx            (renamed copies in one folder)
+
+    Excel lock files (``~$...``) are ignored. Two workbooks resolving to the same
+    temperature (e.g. a Deimos per-organism split) stop the run: use
+    ``temperature_regex`` or a manifest to disambiguate.
     """
     root = Path(root)
     if not root.is_dir():
-        raise FileNotFoundError(f"Deimos root folder not found: {root}")
+        raise FileNotFoundError(f"Deimos results folder not found: {root}")
     found: dict[str, Path] = {}
-    for wb in sorted(root.rglob(RESULTS_WORKBOOK)):
-        rel = wb.relative_to(root)
-        if len(rel.parts) < 2:
-            raise ValueError(f"{wb}: workbook directly in the root folder; expected <root>/<temperature>/...")
-        temp = rel.parts[0]
-        if temperature_regex and not re.search(temperature_regex, temp):
+    for wb in sorted(root.glob(pattern)):
+        if wb.name.startswith("~$") or not wb.is_file():
+            continue
+        temp = temperature_id(wb.relative_to(root), temperature_regex)
+        if temp is None:
             continue
         if temp in found:
-            raise ValueError(f"Two Deimos workbooks for temperature '{temp}': {found[temp]} and {wb}")
+            raise ValueError(f"Two Deimos workbooks for temperature '{temp}': {found[temp]} and {wb} "
+                             f"(set input.temperature_regex or use a manifest)")
         found[temp] = wb
     if not found:
-        raise FileNotFoundError(f"No {RESULTS_WORKBOOK} under {root}")
+        raise FileNotFoundError(f"No Deimos workbook matching '{pattern}' under {root}")
     return dict(sorted(found.items(), key=lambda kv: natural_key(kv[0])))
 
 
 def read_manifest(path: str | Path) -> tuple[dict[str, Path], dict[str, float] | None]:
-    """``runs.csv`` (written by ``fctpp prepare``) or any CSV with columns
-    ``temperature``, ``results_path`` and optionally ``temperature_c``."""
+    """CSV listing the X Deimos workbooks: columns ``temperature``,
+    ``results_path`` and optionally ``temperature_c`` (relative paths are
+    resolved from the manifest folder)."""
     path = Path(path)
     df = pd.read_csv(path, sep=None, engine="python")
     cols = {c.lower(): c for c in df.columns}

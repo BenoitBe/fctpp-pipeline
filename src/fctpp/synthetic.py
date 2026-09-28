@@ -84,8 +84,14 @@ def _planted(n_proteins: int, seed: int) -> dict[str, pd.DataFrame]:
     return tables
 
 
-def make_deimos_like_runs(root: str | Path, n_proteins: int = 300, seed: int = 7) -> Path:
-    """``<root>/<T>/deimos_output/ProteomicAnalysis_Results.xlsx`` for T1..T12."""
+def make_deimos_like_runs(root: str | Path, n_proteins: int = 300, seed: int = 7,
+                          temps: list[str] | None = None, layout: str = "nested") -> Path:
+    """One Deimos-like workbook per temperature (default T1..T12).
+
+    layout: ``nested`` → ``<root>/<T>/proteomics_output/ProteomicAnalysis_Results.xlsx``
+    (Deimos default out_dir inside one folder per temperature); ``flat`` →
+    ``<root>/<T>_ProteomicAnalysis_Results.xlsx``.
+    """
     root = Path(root)
     methods = pd.DataFrame(
         [["LFQ PROTEOMICS PIPELINE — Methods & Parameters", None, None],
@@ -97,50 +103,17 @@ def make_deimos_like_runs(root: str | Path, n_proteins: int = 300, seed: int = 7
          ["Item", "Choice / Value", "Method / Detail"],
          ["Primary statistic", "limma eBayes", "synthetic"],
          ["Design matrix", "~0 + condition", "synthetic"]])
+    keep = set(temps or TEMPS)
     for t, df in _planted(n_proteins, seed).items():
-        out = root / t / "deimos_output"
-        out.mkdir(parents=True, exist_ok=True)
-        with pd.ExcelWriter(out / "ProteomicAnalysis_Results.xlsx", engine="openpyxl") as xw:
+        if t not in keep:
+            continue
+        if layout == "flat":
+            root.mkdir(parents=True, exist_ok=True)
+            path = root / f"{t}_ProteomicAnalysis_Results.xlsx"
+        else:
+            (root / t / "proteomics_output").mkdir(parents=True, exist_ok=True)
+            path = root / t / "proteomics_output" / "ProteomicAnalysis_Results.xlsx"
+        with pd.ExcelWriter(path, engine="openpyxl") as xw:
             methods.to_excel(xw, sheet_name="Methods", header=False, index=False)
             df.to_excel(xw, sheet_name="Differential_Expression", index=False)
     return root
-
-
-def make_raw_pg_matrices(root: str | Path, n_proteins: int = 60, temps: list[str] | None = None,
-                         seed: int = 3, four_annotation_columns: bool = True) -> tuple[Path, Path]:
-    """Raw DIA-NN-like pg_matrix per temperature + R-style template design.
-
-    Sample columns follow the TPP run names: ``...\\250429-Sple-<n><L>_Slot1-..d``
-    with letters B..J = Ctl/C1/C2 × 3 replicates as in the FC.TPP design.
-    """
-    rng = np.random.default_rng(seed)
-    root = Path(root)
-    root.mkdir(parents=True, exist_ok=True)
-    temps = temps or TEMPS[:4]
-    letters = list("BCDEFGHIJ")
-    cond = {"B": "Ctl", "C": "C1", "D": "C2", "E": "Ctl", "F": "C1", "G": "C2",
-            "H": "Ctl", "I": "C1", "J": "C2"}
-    rep = {L: str(i // 3 + 1) for i, L in enumerate(letters)}
-    base = rng.normal(22, 2, n_proteins)
-    for t in temps:
-        n = int(t[1:])
-        cols = {}
-        for k, L in enumerate(letters):
-            x = 2 ** (base + rng.normal(0, 0.2, n_proteins) - 0.3 * n)
-            x[rng.random(n_proteins) < 0.05] = np.nan
-            cols[f"E:\\DATA\\TPP\\250429-Sple-{n}{L}_Slot1-{k + 10}_1_{300 + k}.d"] = x
-        ann = {"Protein.Group": [f"Q{i:05d}" for i in range(n_proteins)],
-               "Protein.Names": [f"PRT{i}_STAA8" for i in range(n_proteins)],
-               "Genes": [f"g{i}" for i in range(n_proteins)],
-               "First.Protein.Description": ["synthetic"] * n_proteins}
-        ann["Protein.Group"][0] = "cRAP-KERATIN"
-        if not four_annotation_columns:
-            ann["N.Sequences"] = rng.integers(1, 20, n_proteins)
-            ann["N.Proteotypic.Sequences"] = rng.integers(1, 20, n_proteins)
-        pd.DataFrame({**ann, **cols}).to_csv(root / f"{t}.tsv", sep="\t", index=False)
-    design = pd.DataFrame({"label": [f"Sple.1{L}" for L in "DCBGFEJIH"],
-                           "condition": [cond[L] for L in "DCBGFEJIH"],
-                           "replicate": [rep[L] for L in "DCBGFEJIH"]})
-    design_path = root / "experimental_design.csv"
-    design.to_csv(design_path, sep=";", index=False)
-    return root, design_path

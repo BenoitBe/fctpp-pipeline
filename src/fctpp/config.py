@@ -9,24 +9,24 @@ from typing import Any
 
 import yaml
 
-from .design import DEIMOS_SAMPLE_REGEX
-from .prepare import DEFAULT_DEIMOS_PARAMS
+from .inputs import DEFAULT_WORKBOOK_GLOB
 
 log = logging.getLogger(__name__)
 
 DEFAULTS: dict[str, Any] = {
     "input": {
         "mode": "deimos",            # deimos | long-table
-        "deimos_root": "deimos_runs",  # folder with one sub-folder per temperature
-        "manifest": None,            # runs.csv (temperature, results_path[, temperature_c])
+        "deimos_root": "deimos_results",  # folder holding the X Deimos result workbooks
+        "workbook_glob": DEFAULT_WORKBOOK_GLOB,
+        "temperature_regex": None,   # e.g. '(T\\d+)': temperature id taken from the path
+        "manifest": None,            # CSV: temperature, results_path[, temperature_c]
         "long_table": None,          # CSV/XLSX in long format (e.g. R TPP_data sheet)
         "long_table_sheet": None,
-        "temperature_regex": None,   # keep only sub-folders matching this regex
     },
     # {T1: 37.0, T2: 40.4, ...} or a CSV path (temperature, celsius); null = ids only
     "temperatures_celsius": None,
-    "filter": {
-        "min_temperatures": 6,
+    "filter": {                      # integer = number of temperatures,
+        "min_temperatures": 6,       # value < 1 = fraction of the X temperatures
         "min_streak": 6,
     },
     "call": {
@@ -56,27 +56,13 @@ DEFAULTS: dict[str, Any] = {
         "excel": "FCTPP_Results.xlsx",
         "csv": True,
     },
-    "prepare": {
-        "raw_dir": "TPP_data",
-        "pattern": "*.tsv",
-        "design": None,              # xlsx/csv; template (R style) or long (with 'temperature')
-        "out_dir": "deimos_runs",
-        "sample_regex": DEIMOS_SAMPLE_REGEX,
-        "match_strategy": "auto",    # auto | exact | suffix
-        "deimos_dir": None,          # clone of deimos-proteomics-pipeline
-        "python": None,              # interpreter for Deimos (default: current)
-        "jobs": 1,
-        "timeout": None,
-        "skip_existing": False,
-        "deimos": copy.deepcopy(DEFAULT_DEIMOS_PARAMS),
-    },
 }
 
 
 def deep_merge(base: dict, over: dict | None, path: str = "") -> dict:
     out = copy.deepcopy(base)
     for k, v in (over or {}).items():
-        if k not in out and path != "prepare.deimos":   # Deimos keys pass through freely
+        if k not in out:
             log.warning("Unknown configuration key '%s%s' (kept)", f"{path}." if path else "", k)
         if isinstance(v, dict) and isinstance(out.get(k), dict):
             out[k] = deep_merge(out[k], v, f"{path}.{k}" if path else k)

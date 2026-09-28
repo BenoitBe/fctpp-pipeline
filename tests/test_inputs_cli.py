@@ -7,7 +7,7 @@ import pytest
 from fctpp.cli import main
 from fctpp.inputs import (discover_deimos_runs, harmonise_contrasts, load_deimos_runs,
                           load_long_table, read_manifest)
-from fctpp.synthetic import CELSIUS
+from fctpp.synthetic import CELSIUS, make_deimos_like_runs
 
 
 def test_discover_and_load(deimos_root):
@@ -18,6 +18,30 @@ def test_discover_and_load(deimos_root):
     assert li.results["imputed"].dropna().isin([True, False]).all()   # VRAI/FAUX parsed
     assert len(li.provenance) == 12 and li.provenance["sha256"].str.len().eq(64).all()
     assert not li.warnings
+
+
+def test_discovery_layouts(tmp_path):
+    # flat folder of renamed copies, X = 5 temperatures, plus an Excel lock file
+    flat = make_deimos_like_runs(tmp_path / "flat", n_proteins=40,
+                                 temps=["T1", "T2", "T3", "T10", "T11"], layout="flat")
+    (flat / "~$T1_ProteomicAnalysis_Results.xlsx").write_bytes(b"lock")
+    assert list(discover_deimos_runs(flat)) == ["T1", "T2", "T3", "T10", "T11"]
+    # folders named freely: the temperature id comes from a regex
+    free = tmp_path / "free"
+    for t in ("T1", "T2", "T12"):
+        src = make_deimos_like_runs(tmp_path / f"src_{t}", n_proteins=20, temps=[t])
+        dst = free / f"TPP_{t}_deimos" / "proteomics_output"
+        dst.mkdir(parents=True)
+        shutil.copy(src / t / "proteomics_output" / "ProteomicAnalysis_Results.xlsx", dst)
+    runs = discover_deimos_runs(free, temperature_regex=r"_(T\d+)_")
+    assert list(runs) == ["T1", "T2", "T12"]
+    assert list(discover_deimos_runs(free)) == ["TPP_T1_deimos", "TPP_T2_deimos", "TPP_T12_deimos"]
+    # two workbooks for one temperature (e.g. Deimos species split) -> explicit error
+    extra = free / "TPP_T1_deimos" / "proteomics_output" / "STAA8"
+    extra.mkdir()
+    shutil.copy(runs["T1"], extra)
+    with pytest.raises(ValueError, match="Two Deimos workbooks"):
+        discover_deimos_runs(free, temperature_regex=r"_(T\d+)_")
 
 
 def test_harmonise_flips_reversed_contrast():
@@ -32,7 +56,7 @@ def test_harmonise_flips_reversed_contrast():
 def test_inconsistent_deimos_methods_are_reported(deimos_root, tmp_path):
     root = tmp_path / "runs"
     shutil.copytree(deimos_root, root)
-    wb_path = root / "T5" / "deimos_output" / "ProteomicAnalysis_Results.xlsx"
+    wb_path = root / "T5" / "proteomics_output" / "ProteomicAnalysis_Results.xlsx"
     wb = openpyxl.load_workbook(wb_path)
     ws = wb["Methods"]
     for row in ws.iter_rows():
@@ -85,9 +109,23 @@ def test_cli_rule_and_errors(deimos_root, tmp_path, capsys):
     assert main(["analyze", "--deimos-root", str(tmp_path / "missing"), "-o", str(tmp_path / "o2")]) == 1
 
 
+def test_cli_small_series_with_fractions(tmp_path):
+    """X = 5 temperatures: the R defaults (6/6) are impossible and stop the run
+    with an explicit message; fractions adapt the filter to the series."""
+    root = make_deimos_like_runs(tmp_path / "x5", temps=[f"T{i}" for i in range(6, 11)])
+    out = tmp_path / "o5"
+    assert main(["analyze", "--deimos-root", str(root), "-o", str(out), "--no-plots"]) == 1
+    assert main(["analyze", "--deimos-root", str(root), "-o", str(out), "--no-plots",
+                 "--min-temperatures", "0.5", "--min-streak", "0.5"]) == 0
+    hits = pd.read_csv(out / "TPP_hits.csv")
+    assert "P0001" in set(hits["name"])
+
+
 def test_init_config(tmp_path):
     p = tmp_path / "cfg.yaml"
     assert main(["init-config", "-o", str(p)]) == 0
     from fctpp.config import load_config
     cfg = load_config(p)
-    assert cfg["call"]["rule"] == "strict" and cfg["prepare"]["deimos"]["control_condition"] == "Ctl"
+    assert cfg["call"]["rule"] == "strict"
+    assert cfg["input"]["workbook_glob"] == "**/*ProteomicAnalysis_Results*.xlsx"
+    assert "prepare" not in cfg

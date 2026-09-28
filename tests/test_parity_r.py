@@ -4,22 +4,27 @@
 
 1. Call logic: the R ``TPP_data`` sheet re-analysed with ``rule=r_legacy`` gives
    identical ``_logpval`` and ``_threshold`` columns.
-2. Presence statistics: recomputed from the raw ``TPP_data/T*.tsv`` (cRAP
-   removal + DEP ``filter_missval(thr = 1)`` + DEP-style label matching), the
-   ``nb_temp`` / ``max_consecutive`` values equal the R ``Stats_proteins`` sheet.
+2. Presence statistics: recomputed from the raw ``TPP_data/T*.tsv`` with the DEP
+   rules (cRAP removal, ``filter_missval(thr = 1)``, label matching after removal
+   of the longest common prefix as in ``DEP::make_se``), ``nb_temp`` and
+   ``max_consecutive`` equal the R ``Stats_proteins`` sheet.
 """
+
+import os
+import re
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from fctpp.design import match_samples, read_design
 from fctpp.inputs import load_long_table
-from fctpp.prepare import discover_raw_files, split_pg_matrix
-from fctpp.temperatures import TemperatureSeries
+from fctpp.temperatures import TemperatureSeries, natural_key
 from fctpp.tpp import CallParams, presence_stats, run_tpp
 
 pytestmark = pytest.mark.realdata
+
+ANNOTATIONS = {"Protein.Group", "Protein.Ids", "Protein.Names", "Genes",
+               "First.Protein.Description", "Proteotypic", "N.Sequences", "N.Proteotypic.Sequences"}
 
 
 def test_call_logic_matches_r(r_project):
@@ -33,27 +38,31 @@ def test_call_logic_matches_r(r_project):
         np.testing.assert_allclose(m[f"{c}_logpval_R"], m[f"{c}_logpval_py"], rtol=0, atol=1e-12)
 
 
-def dep_filter_missval(x: pd.DataFrame, conditions: np.ndarray, thr: int = 1) -> pd.Series:
-    """DEP::filter_missval: <= thr missing values in at least one condition."""
-    miss = pd.DataFrame({c: x.loc[:, conditions == c].isna().sum(axis=1) for c in np.unique(conditions)})
-    return (miss <= thr).any(axis=1)
+def _suffixes(labels):
+    """DEP delete_prefix + make.names, as in make_se()."""
+    canon = [re.sub(r"[^A-Za-z0-9._]", ".", str(x)) for x in labels]
+    prefix = os.path.commonprefix(canon)
+    return [x[len(prefix):] for x in canon]
 
 
 def test_presence_statistics_match_r(r_project):
     raw = r_project / "TPP_data"
-    design = read_design(raw / "experimental_design.xlsx")
+    design = pd.read_excel(raw / "experimental_design.xlsx", dtype=str)
+    d_suffix = dict(zip(_suffixes(design["label"]), design["condition"]))
     parts = []
-    for t, p in discover_raw_files(raw).items():
+    for p in sorted(raw.glob("T*.tsv"), key=lambda f: natural_key(f.stem)):
         df = pd.read_csv(p, sep="\t")
         crap = (df["Protein.Group"].astype(str).str.startswith("cRAP")
                 | df["Protein.Names"].astype(str).str.startswith("cRAP"))
         df = df[~crap]
-        _, samples = split_pg_matrix(df)
-        m = match_samples(samples, design)
-        x = df[m["column"]].replace(0, np.nan)
-        keep = dep_filter_missval(x, m["condition"].to_numpy())
+        samples = [c for c in df.columns if c not in ANNOTATIONS]
+        clean = [re.search(r"(Sple-[^_]+)_", c).group(1) for c in samples]
+        cond = np.array([d_suffix[s] for s in _suffixes(clean)])
+        x = df[samples].replace(0, np.nan)
+        miss = pd.DataFrame({c: x.loc[:, cond == c].isna().sum(axis=1) for c in np.unique(cond)})
+        keep = (miss <= 1).any(axis=1)           # DEP::filter_missval(thr = 1)
         names = df.loc[keep, "Protein.Group"].astype(str).str.split(";").str[0]
-        parts.append(pd.DataFrame({"Temperature": t, "name": names}))
+        parts.append(pd.DataFrame({"Temperature": p.stem, "name": names}))
     long = pd.concat(parts)
     st = presence_stats(long, TemperatureSeries.from_ids(long["Temperature"].unique()))
     r = pd.read_excel(r_project / "TPP_results.xlsx", sheet_name="Stats_proteins")

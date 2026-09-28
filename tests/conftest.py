@@ -3,17 +3,13 @@ from pathlib import Path
 
 import pytest
 
-from fctpp.synthetic import make_deimos_like_runs, make_raw_pg_matrices
+from fctpp.synthetic import make_deimos_like_runs
 
 
 @pytest.fixture(scope="session")
 def deimos_root(tmp_path_factory) -> Path:
-    return make_deimos_like_runs(tmp_path_factory.mktemp("deimos_runs"))
-
-
-@pytest.fixture()
-def raw_dir(tmp_path) -> tuple[Path, Path]:
-    return make_raw_pg_matrices(tmp_path / "raw")
+    """12 synthetic Deimos result workbooks (<root>/<T>/proteomics_output/...)."""
+    return make_deimos_like_runs(tmp_path_factory.mktemp("deimos_results"))
 
 
 @pytest.fixture(scope="session")
@@ -25,8 +21,8 @@ def r_project() -> Path:
 
 
 @pytest.fixture(scope="session")
-def deimos_dir() -> Path:
-    p = os.environ.get("FCTPP_DEIMOS_DIR")
-    if not p or not Path(p, "deimos.py").exists():
-        pytest.skip("set FCTPP_DEIMOS_DIR to a clone of deimos-proteomics-pipeline")
+def real_deimos_results() -> Path:
+    p = os.environ.get("FCTPP_DEIMOS_RESULTS")
+    if not p or not Path(p).is_dir():
+        pytest.skip("set FCTPP_DEIMOS_RESULTS to a folder holding the real Deimos result workbooks")
     return Path(p)

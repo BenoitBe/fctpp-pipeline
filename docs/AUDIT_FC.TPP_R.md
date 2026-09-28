@@ -20,7 +20,7 @@ Pas de R disponible dans l'environnement : les constats sur DEP sont vérifiés 
 
 | # | Sévérité | Constat | Dans la version Python |
 |---|---|---|---|
-| A1 | Élevée | Appariement échantillons ↔ design par effet de bord (`delete_prefix` de DEP) | Stratégie explicite, bijection vérifiée, `sample_mapping.csv` |
+| A1 | Élevée | Appariement échantillons ↔ design par effet de bord (`delete_prefix` de DEP) | Fait en amont par Deimos : un design par température, appariement exact des labels |
 | A2 | Élevée | « 2 températures consécutives » = 2 *lignes successives* : trous et inversions de signe acceptés | Règle `strict` par défaut ; `r_legacy` pour reproduire R |
 | A3 | Élevée | `p.adj` de DEP = q-value fdrtool, **inférieure à p.val dans 29 à 47 % des lignes** | Deimos : BH ; FC.TPP utilise `p.val` (comme R) ou `p.adj` BH au choix |
 | A4 | Élevée | Aucun contrôle de multiplicité entre températures × contrastes | Documenté ; règle stricte ; pistes de calibration |
@@ -51,12 +51,7 @@ Rien n'est rapporté à l'utilisateur.
 
 *Vérification.* La même logique, réimplémentée explicitement, redonne exactement les présences R. Sur les 12 températures, T1 s'apparie en exact et T2 à T12 par suffixe.
 
-*Python.* `design.match_samples()` :
-- essaie un appariement exact, puis par suffixe (DEP-compatible) ;
-- exige une bijection ;
-- écrit chaque correspondance dans `sample_mapping.csv`.
-
-Le design « long » (avec une colonne `temperature`) est recommandé.
+*Dans la nouvelle chaîne.* L'appariement se fait dans Deimos, qui exige un design par température avec les labels exacts de cette température (`Sple-2B` à T2, etc.) et arrête le run si un label manque. Le problème disparaît donc, à condition de fournir X designs cohérents : même ordre des conditions et même contrôle partout. FC.TPP vérifie ensuite que les X classeurs exposent les mêmes contrastes.
 
 ### A2. Règle des températures consécutives (`tidy_tpp`, l. 989-1000)
 
@@ -217,7 +212,7 @@ Problèmes de l'enrichissement GO (topGO) :
 |---|---|
 | Appels (`r_legacy`) sur `TPP_data` R | 23 792 lignes, 3 contrastes : `_logpval` et `_threshold` **identiques** |
 | Statistiques de présence recalculées depuis les `T*.tsv` bruts | 2 215 protéines : `nb_temp` et `max_consecutive` **identiques** ; 2 041 retenues (idem R) |
-| Préparation + Deimos sur les 12 températures | 12/12 runs OK (~30 s chacun) ; mêmes 2 041 protéines retenues |
+| 12 runs Deimos (un par température) puis `fctpp analyze` sur les 12 classeurs | 12/12 runs OK (~30 s chacun) ; mêmes 2 041 protéines retenues |
 | log2FC Deimos vs DEP, lignes sans imputation | identiques (écart max 2 × 10⁻¹⁴) |
 | Hits | Les 2 hits R retrouvés + 1 hit supplémentaire signalé comme douteux (`imputed_in_run`, absent à T1) |
 | Tests | 70 tests (synthétiques + CLI) ; `-m realdata` et `-m deimos` sur les données réelles |
@@ -226,8 +221,8 @@ Problèmes de l'enrichissement GO (topGO) :
 
 ## 5. Recommandations hors FC.TPP
 
-1. **Deimos, `load_data`** : `tsv.columns[:6]` suppose 6 colonnes d'annotation. Un export DIA-NN ancien (4 colonnes) fait basculer 2 runs en annotations ; le diagnostic des labels s'arrête alors avec un message trompeur. Détecter plutôt les colonnes numériques. `fctpp prepare` contourne le problème.
+1. **Deimos, `load_data`** : `tsv.columns[:6]` suppose 6 colonnes d'annotation. Un export DIA-NN ancien (4 colonnes) fait basculer 2 runs en annotations ; le diagnostic des labels s'arrête alors avec un message trompeur. Détecter plutôt les colonnes numériques. En attendant, exporter les matrices TPP avec DIA-NN ≥ 2 (6 colonnes d'annotation).
 2. **Deimos, regex `Sple-[^_]+`** codée en dur (diagnostic et chargement) : à passer en paramètre YAML.
 3. **Deimos, seed** : les correctifs du 22/09 (seed, QRILC par régression quantile, `impute_method: auto`) ne sont pas dans le commit GitHub `4d49d24` utilisé ici. À pousser.
-4. **Deimos en mode TPP** : éviter `impute_method: auto`, qui peut choisir une méthode différente selon la température. `fctpp prepare` impose `qrilc` par défaut et `fctpp analyze` vérifie l'homogénéité.
+4. **Deimos en mode TPP** : éviter `impute_method: auto`, qui peut choisir une méthode différente selon la température. Fixer la même méthode pour les X runs ; `fctpp analyze` vérifie l'homogénéité dans les feuilles `Methods` et la signale sinon.
 5. **rDEP** : revoir toute liste de protéines « significatives » produite avec `add_rejections` (cf. A3).
