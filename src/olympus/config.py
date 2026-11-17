@@ -37,6 +37,19 @@ DEFAULTS: dict[str, Any] = {
         "rule": "strict",            # strict | r_legacy
         "abundance_check": True,
     },
+    "shift_test": {
+        "enabled": "auto",           # auto = when Deimos matrices/ sit next to every workbook
+        "deimos_dir": None,          # Deimos folder providing limma_ebayes.py (or env DEIMOS_DIR)
+        "paired": "auto",            # auto | true | false : lysate (replicate) as block
+        "baseline": "median",        # median | lowest | none
+        "window": None,              # adjacent temperatures per window (null = call.min_consecutive)
+        "alpha": 0.05,               # protein-level FDR (Simes over windows, then BH)
+        "fc_cutoff": None,           # null = call.fc_cutoff
+        "use_adjacent_correlation": True,
+        "permutations": True,        # within-lysate swaps -> FDR estimate of each rule
+        "max_patterns": 64,
+        "seed": 42,
+    },
     "plots": {
         "volcano": True,
         "volcano_layout": "grid",    # grid (1 page / contrast) | pages (1 page / temperature x contrast)

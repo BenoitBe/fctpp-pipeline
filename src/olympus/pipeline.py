@@ -68,13 +68,28 @@ def analyze(cfg: dict) -> dict:
     res.notes.extend(loaded.warnings)
 
     outputs: dict[str, object] = {}
+    from .shift_pipeline import methods_rows, run_shift_analysis, summary_columns
+    sr = run_shift_analysis(cfg, loaded, temps, res, mode)
+    outputs["shift"] = sr
+    extra, mrows = [], []
+    if sr is not None:
+        extra = [("Shift_test", sr.table)]
+        if len(sr.fdr):
+            extra.append(("FDR_estimates", sr.fdr))
+        mrows = methods_rows(sr)
     run_info = {"input_mode": mode, "input": source, "warnings": loaded.warnings, "config": cfg}
     outputs["excel"] = write_workbook(res, out_dir / cfg["output"]["excel"], run_info=run_info,
-                                      provenance=loaded.provenance, methods_upstream=loaded.methods)
+                                      provenance=loaded.provenance, methods_upstream=loaded.methods,
+                                      summary=summary_columns(sr, res), extra_sheets=extra,
+                                      methods_extra=mrows)
     if cfg["output"].get("csv", True):
         res.data.to_csv(out_dir / "TPP_data.csv", index=False)
         res.hits.to_csv(out_dir / "TPP_hits.csv", index=False)
         outputs["csv"] = [out_dir / "TPP_data.csv", out_dir / "TPP_hits.csv"]
+        if sr is not None:
+            sr.table.to_csv(out_dir / "shift_test.csv", index=False)
+            sr.windows.to_csv(out_dir / "shift_windows.csv", index=False)
+            outputs["csv"] += [out_dir / "shift_test.csv", out_dir / "shift_windows.csv"]
 
     pl = cfg["plots"]
     label = pl.get("label_column")
@@ -97,6 +112,9 @@ def analyze(cfg: dict) -> dict:
         outputs["profiles"] = profiles_pdf(res, out_dir / "TPP_plots.pdf",
                                            view=pl.get("profiles_view", "both"),
                                            pick=pl.get("profiles_pick", "both"), label_column=label)
+    if sr is not None and pl.get("profiles", True):
+        from .plots import shift_pdf
+        outputs["shift_plots"] = shift_pdf(sr, res, out_dir / "shift_test_plots.pdf", label_column=label)
     if pl.get("plot3d", True) or pl.get("gif", False):
         from .plot3d import plot3d_html, rotation_gif
         outputs["plot3d"], outputs["gif"] = [], []

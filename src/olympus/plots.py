@@ -293,3 +293,74 @@ def profiles_pdf(res: TPPResult, out_pdf: str | Path, *, view: str = "both", pic
                         plt.close(fig)
     log.info("Profiles: %s", out_pdf)
     return out_pdf
+
+
+def shift_pdf(sr, res: TPPResult, out_pdf: str | Path, *, label_column: str | None = "Genes",
+              top: int = 12) -> Path:
+    """Shift test figures, per contrast: p-value histogram (calibration check) and
+    the top candidates' Δ profile (± 95 % CI) with baseline and best window."""
+    temps = res.temperatures
+    xs = np.array([temps.x(t) for t in temps.ids])
+    out_pdf = Path(out_pdf)
+    lab_map = dict(zip(res.data["name"], _label_series(res.data, label_column)))
+    with _style(), PdfPages(out_pdf) as pdf:
+        for j, c in enumerate(res.contrasts):
+            tab = sr.table[sr.table["contrast"] == c].sort_values("p_protein")
+            fig, ax = plt.subplots(figsize=(5.2, 3.6))
+            pv = tab["p_protein"].dropna()
+            ax.hist(pv, bins=np.linspace(0, 1, 21), color=NEUTRAL, edgecolor="white", linewidth=0.6)
+            ax.axhline(len(pv) / 20, color=INK_2, lw=0.7, ls="--")
+            ax.set_xlabel("protein-level p-value (Simes over windows)")
+            ax.set_ylabel("proteins")
+            ax.set_title(f"{c} — {len(pv)} proteins tested, {int(tab['hit'].sum())} hits "
+                         f"(q ≤ {sr.params.alpha:g})", fontsize=9)
+            ax.text(0.98, 0.95, "dashed: uniform (no signal)", transform=ax.transAxes, ha="right",
+                    va="top", fontsize=6.5, color=INK_2)
+            fig.tight_layout()
+            pdf.savefig(fig)
+            plt.close(fig)
+
+            sel = tab.head(top)
+            if sel.empty:
+                continue
+            ncol = 4
+            nrow = int(np.ceil(len(sel) / ncol))
+            fig, axes = plt.subplots(nrow, ncol, figsize=(2.7 * ncol + 0.4, 2.3 * nrow + 0.9),
+                                     sharex=True, squeeze=False)
+            for ax, (_, row) in zip(axes.flat, sel.iterrows()):
+                n = row["name"]
+                d, se = [], []
+                for t in temps.ids:
+                    f = sr.fits[t]
+                    k = f.proteins.get_indexer([n])[0]
+                    d.append(f.diff[k, j] if k >= 0 else np.nan)
+                    se.append(f.se[k, j] if k >= 0 else np.nan)
+                d, se = np.array(d), np.array(se)
+                color = UP if row["direction"] == "up" else DOWN if row["direction"] == "down" else INK_2
+                if row["best_window"]:
+                    parts = str(row["best_window"]).split("-")
+                    x0, x1 = temps.x(parts[0]), temps.x(parts[-1])
+                    pad = (xs[1] - xs[0]) / 2 if len(xs) > 1 else 0.5
+                    ax.axvspan(x0 - pad, x1 + pad, color=color, alpha=0.10, lw=0)
+                ax.axhline(0, color=INK_2, lw=0.6)
+                if np.isfinite(row["baseline"]):
+                    ax.axhline(row["baseline"], color=MUTED, lw=0.7, ls="--")
+                ax.errorbar(xs, d, yerr=1.96 * se, color=color, lw=1.1, marker="o", ms=2.8,
+                            elinewidth=0.6, capsize=1.5)
+                star = " ★" if row["hit"] else ""
+                ax.set_title(f"{lab_map.get(n, n)} ({n}){star}", fontsize=7)
+                ax.text(0.02, 0.96, f"q={row['q_protein']:.2g} · {row['best_window']} · D={row['dd_best']:+.2f}",
+                        transform=ax.transAxes, fontsize=5.5, color=INK_2, va="top")
+            for ax in list(axes.flat)[len(sel):]:
+                ax.set_visible(False)
+            for ax in axes[-1, :]:
+                _set_temperature_axis(ax, temps)
+            for ax in axes[:, 0]:
+                ax.set_ylabel("log2 FC (± 95 % CI)")
+            fig.suptitle(f"{c} — top {len(sel)} shift-test candidates (dashed: baseline, shaded: best window, "
+                         f"★ hit)", fontsize=9, fontweight="bold")
+            fig.tight_layout(rect=(0, 0, 1, 0.94))
+            pdf.savefig(fig)
+            plt.close(fig)
+    log.info("Shift test plots: %s", out_pdf)
+    return out_pdf

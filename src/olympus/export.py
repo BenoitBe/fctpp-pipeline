@@ -99,13 +99,20 @@ def methods_table(res: TPPResult, run_info: dict) -> pd.DataFrame:
 
 def write_workbook(res: TPPResult, out_path: str | Path, *, run_info: dict | None = None,
                    provenance: pd.DataFrame | None = None, methods_upstream: pd.DataFrame | None = None,
-                   wide: bool = True) -> Path:
+                   wide: bool = True, summary: pd.DataFrame | None = None,
+                   extra_sheets: list[tuple[str, pd.DataFrame]] | None = None,
+                   methods_extra: list[tuple[str, str, str]] | None = None) -> Path:
     run_info = run_info or {}
     out_path = Path(out_path)
     used: set[str] = set()
+    methods = methods_table(res, run_info)
+    if methods_extra:
+        methods = pd.concat([methods, pd.DataFrame(methods_extra, columns=["Item", "Value", "Detail"])],
+                            ignore_index=True)
     sheets: list[tuple[str, pd.DataFrame]] = [
-        ("Methods", methods_table(res, run_info)),
-        ("Summary", res.summary),
+        ("Methods", methods),
+        ("Summary", summary if summary is not None else res.summary),
+        *(extra_sheets or []),
         ("Hits", res.hits),
         ("TPP_data", res.data),
         ("Stats_proteins", res.stats),
