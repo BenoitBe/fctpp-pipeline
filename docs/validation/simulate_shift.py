@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-from olympus.engine import fit_series, load_limma          # noqa: E402
+from olympus.engine import block_correlation, fit_series, load_limma  # noqa: E402
 from olympus.synthetic import SIM_TEMPS_C, simulate_intensity_series  # noqa: E402
 from olympus.shift import ShiftParams, adjacent_correlation, fits_to_long, shift_test  # noqa: E402
 from olympus.temperatures import TemperatureSeries         # noqa: E402
@@ -70,6 +70,17 @@ def run_once(limma, seed, n_lysates, realistic=True):
             rows.append({"method": label, "contrast": c, "seed": seed, "lysates": n_lysates,
                          **score(set(r.hits.loc[r.hits.contrast == c, "name"]), truth, c)})
     rho = adjacent_correlation(fits_p, TEMPS)
+    bc = block_correlation(mats, TEMPS)
+    rows.append({"method": "pairing decision (auto)", "contrast": "-", "seed": seed, "lysates": n_lysates,
+                 "paired": int(bc.decide()), "block_rho": round(bc.rho, 3), "block_p": bc.p})
+    for wins in ((2, 3), (2, 3, 4)):
+        prm = ShiftParams(baseline="none", windows=wins, alpha=0.05, fc_cutoff=0.6, localisation_p=0.01)
+        tab, _ = shift_test(fits_p, TEMPS, CONTRASTS, prm, rho)
+        for c in ("C1_vs_Ctl", "C2_vs_Ctl"):
+            rows.append({"method": f"shift test, baseline none + localisation p≤0.01, windows "
+                                   f"{'/'.join(map(str, wins))}, q≤0.05", "contrast": c,
+                         "seed": seed, "lysates": n_lysates,
+                         **score(set(tab.loc[(tab.contrast == c) & tab.hit, "name"]), truth, c)})
     for baseline, loc in (("none", 0.01), ("none", None), ("median", None), ("lowest", None)):
         for alpha in (0.05, 0.10):
             prm = ShiftParams(baseline=baseline, window=2, alpha=alpha, fc_cutoff=0.6, localisation_p=loc)

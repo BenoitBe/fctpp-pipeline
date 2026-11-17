@@ -137,14 +137,22 @@ It runs when every Deimos output has its `matrices/` folder (`log2_imputed.tsv` 
    matrix. When one lysate (replicate) is split into every condition, the lysate
    becomes a block: `~0 + condition + replicate`. On the S. aureus TPP data this
    multiplies the number of proteins at p < 0.01 by 2 to 5 at most temperatures.
-2. **Windows of adjacent temperatures** (`window` = `call.min_consecutive`, 2 by
-   default). D = mean log2FC over the window. Its variance includes the residual
-   correlation between adjacent temperatures for the same lysate; Welch–Satterthwaite
-   degrees of freedom are used.
+   - `paired: auto` (default) pairs only when the data show it is worth it: complete
+     blocks, and a positive within-lysate correlation of the residuals between
+     conditions (same-lysate pairs vs different-lysate pairs, one-sided test over
+     the temperatures, p < 0.05). The decision and the estimated correlation are in
+     `Methods` (row `Pairing`). `paired: true | false` forces it.
+2. **Windows of adjacent temperatures** (`windows: [2, 3, 4]` by default). D = mean
+   log2FC over the window. Two temperatures catch narrow shifts; 3–4 catch broad ones
+   (large ΔTm, shallow melting curves). Every window of every size enters the same
+   Simes combination. The variance of D includes the residual correlation between
+   adjacent temperatures for the same lysate; Welch–Satterthwaite degrees of freedom
+   are used. `window: 2` gives the former single-size behaviour.
 3. **Protein level.**
    - Simes combination of the window p-values, then Benjamini–Hochberg across the
      proteins retained by the presence filter, per contrast: `q_protein`.
-   - Hit = `q_protein ≤ alpha` (0.05) and |D| ≥ `fc_cutoff`.
+   - Hit = `q_protein ≤ alpha` (0.05) and `dd_peak` ≥ `fc_cutoff`, where `dd_peak` is
+     the largest same-sign |D| among the windows inside the best window.
 4. **Localisation check** (`localisation_p: 0.01`). The detected window must also
    differ from the median of the protein's profile. A constant offset (handling
    artefact in lysate, abundance change in cells) is significant everywhere but never
@@ -152,7 +160,23 @@ It runs when every Deimos output has its `matrices/` folder (`log2_imputed.tsv` 
 5. **Permutations.** The two conditions of a contrast are swapped in a subset of the
    lysates, the same subset at every temperature. The null hits give an FDR estimate
    for the shift test and for the legacy rule (sheet `FDR_estimates`). With 3 lysates
-   there are only 3 distinct patterns, so the estimate is indicative.
+   there are only 3 distinct patterns, so the estimate is indicative. Permutations
+   cannot see an effect that is the same in every lysate (next point).
+6. **Shared component** (diagnostic, sheet `Shared_component`). A ligand stabilises
+   one protein or a few. When many proteins move together between conditions at some
+   temperatures, the cause is usually handling per temperature, a solvent effect or
+   co-aggregating complexes. Olympus takes the first SVD component of the protein ×
+   temperature log2FC matrix and compares its share of variance with sign-flip draws.
+   - The component is *strong* when p ≤ 0.05 and its share is at least 1.5 × the 95 %
+     quantile of the draws (`shared_min_ratio`).
+   - Each protein gets `r_shared`, the correlation of its profile with the shared
+     pattern. When the component is strong, proteins with |r| ≥ 0.7 are flagged
+     `shared_profile`.
+   - Hits are flagged, never removed: `hit_specific` = hit and not `shared_profile`.
+     The legacy hits get the same two columns.
+   - Look at the temperature pattern (first page of `shift_test_plots.pdf` after the
+     histogram). A sign change between neighbouring temperatures, such as + at T6 and
+     T8 but − at T7, cannot come from a melting transition.
 
 Other baselines: `baseline: median` (D relative to the profile median: most robust,
 less powerful) and `baseline: lowest` (classical ΔΔ against the lowest temperature:
@@ -170,10 +194,11 @@ noisiest).
 | `TPP_plots.pdf` | FC and -log10 p profiles: all proteins in grey with hits highlighted, then one panel per hit. |
 | `<contrast>_plot3D.html` | Interactive 3D view (temperature × log2FC × -log10 p) with threshold planes. `plotly_js: embed` (default) works offline. |
 | `<contrast>_rotation.gif` | Optional (`plots.gif: true`), rendered with matplotlib. |
-| `shift_test.csv`, sheet `Shift_test` | Shift test, one row per contrast × protein: best window, D, `p_protein`, `q_protein`, localisation, `hit`. |
-| `shift_windows.csv` | Every window statistic (D, SE, df, p). |
+| `shift_test.csv`, sheet `Shift_test` | Shift test, one row per contrast × protein: best window and its size, D, `dd_peak`, `p_protein`, `q_protein`, localisation, `hit`, `r_shared`, `shared_profile`, `hit_specific`. |
+| `shift_windows.csv` | Every window statistic (size, D, SE, df, p). |
 | sheet `FDR_estimates` | Permutation estimates for the shift test and the legacy rule. |
-| `shift_test_plots.pdf` | Per contrast: p-value histogram (calibration check), then the top candidates (log2FC ± 95 % CI per temperature, best window shaded). |
+| sheet `Shared_component` | Per contrast: share of variance of the shared component, sign-flip null, status, number of flagged proteins and hits, temperature loadings. |
+| `shift_test_plots.pdf` | Per contrast: p-value histogram (calibration check), the shared component (temperature pattern, distribution of `r_shared`), then the top candidates (log2FC ± 95 % CI per temperature, best window shaded). |
 | `last_config.yaml` | Full configuration of the run. |
 
 Consistency checks on the inputs:
@@ -211,9 +236,9 @@ On the 12-temperature *S. aureus* dataset of the R project:
 | Deimos vs DEP log2FC, rows without imputation | identical (max difference 2 × 10⁻¹⁴, 22,423 rows) |
 | Deimos vs DEP log2FC, rows with imputation (QRILC vs MinProb) | median \|Δ\| = 0.29 (1,369 rows) |
 | Hits | Both R hits found again (C1_vs_Ctl, T9–T10, up). One extra hit in C2_vs_Ctl, flagged `imputed_in_run` + `undetermined` (absent at T1). |
-| Shift test | No protein at q ≤ 0.05. Q2FVX1 and Q2FYE7 are the top-ranked candidates of C1_vs_Ctl (T9–T10), not significant after FDR control. The permutations give about as many legacy-rule hits as the real labels. |
+| Shift test | Paired (within-lysate correlation 0.44). With windows 2/3/4, one hit: Q2FYE7 in C1_vs_Ctl (T7–T10, q = 0.035); Q2FVX1 ranks 3rd (q = 0.21). No hit in the permutations. Shared component weak (dominated by T12, no flag). The permutations give about as many legacy-rule hits as the real labels. |
 
-**Simulation** (`docs/validation/simulate_shift.py`, 4 simulated datasets of 2,000 proteins).
+**Simulation** (`docs/validation/simulate_shift.py`, 6 simulated datasets of 2,000 proteins per lysate count).
 
 Model: lysate-treated TPP. C1 stabilises 4 % of the proteins (ΔTm 2, 4 or 6 °C); C2
 carries a constant +0.8 offset on 2 % (artefact). The noise is calibrated on the real
@@ -221,11 +246,15 @@ data: protein-specific variances with d0 = 2, t5 noise, 3 % censored values impu
 
 | 3 lysates | False discovery proportion | Sensitivity ΔTm 2 °C | ΔTm 4 °C | Offsets called (of 40) |
 |---|---|---|---|---|
-| Legacy rule (Deimos fit) | 0 % | 0.48 | 0.91 | 33 |
-| Shift test, default | 3.2 % | **0.67** | 0.89 | **1** |
-| Shift test, `baseline: median` | 6.7 % | 0.37 | 0.87 | 0 |
+| Legacy rule (Deimos fit) | 0 % | 0.47 | 0.92 | 33 |
+| Shift test, default (windows 2/3/4) | 2.3 % | **0.75** | 0.93 | **0.7** |
+| Shift test, `window: 2` | 3.8 % | 0.64 | 0.92 | 0.8 |
+| Shift test, `baseline: median` | 6.7 % | 0.37 | 0.88 | 0 |
 
-With 4 lysates the default reaches 1.1 % FDP and a sensitivity of 0.72 at ΔTm = 2 °C.
+With 4 lysates the default reaches 0.9 % FDP and a sensitivity of 0.78 at ΔTm = 2 °C.
+The pairing test chose the paired fit in every simulated dataset (within-lysate
+correlation ≈ 0.4). With a pattern shared by 8 % of the proteins (unit test), the
+shared component is strong and flags most of them, but few true shifts.
 
 The legacy rule makes about one false call per contrast whatever the data. When
 real shifts are rare, its few hits are therefore mostly false, and it calls almost
@@ -248,10 +277,14 @@ are not set.
 
 ## Limitations and ideas
 
-- To be validated on a TPP dataset with a known ligand–target pair.
-- With 3 lysates, the permutation estimates rest on 3 patterns only, and the shift
-  test is slightly anti-conservative under heavy-tailed noise (3 % FDP for a 5 %
-  nominal level in simulation). 4 lysates or more are recommended.
+- Validated on one unpublished lysate dataset with a known ligand–target pair (details
+  kept out of this repository). The target ranks first, and the shared component
+  shows that most of the other hits follow a non-thermal pattern common to many
+  proteins.
+- With 3 lysates, the permutation estimates rest on 3 patterns only. 4 lysates or more
+  are recommended.
+- The shared component is a diagnostic: it flags, it does not correct. An adjustment
+  (RUV-type, using the shape of the pattern) is a possible next step.
 - Melting curves and Tm (NPARC-type, Childs et al. 2019) need intensities that are
   comparable across temperatures. For new acquisitions, run DIA-NN on all
   temperatures together, without cross-run normalisation.

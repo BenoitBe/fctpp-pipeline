@@ -102,3 +102,64 @@ def test_permutation_null_counts(limma_engine, sim_series):
 
     out = permutation_null(limma_engine, mats, TEMPS, ["C1_vs_Ctl"], evaluate)
     assert out == {"C1_vs_Ctl": [1, 1, 1]}                      # 3 lysates -> 3 patterns
+
+
+# ---------------------------------------------------------------- pairing, windows, shared component
+
+def test_block_correlation_decides_pairing(sim_series):
+    from olympus.engine import block_correlation
+    mats, _ = sim_series
+    bc = block_correlation(mats, TEMPS)
+    assert bc.complete and bc.n_blocks == 3
+    assert bc.rho > 0.2 and bc.p < 1e-4 and bc.decide()
+    assert bc.different < 0                                     # ≈ −ρ/(n−1)
+    from dataclasses import replace
+    rng = np.random.default_rng(3)                              # pure noise: no lysate effect
+    m0 = {t: replace(tm, imputed=pd.DataFrame(rng.normal(20, 0.3, tm.imputed.shape), index=tm.imputed.index,
+                                              columns=tm.imputed.columns)) for t, tm in mats.items()}
+    b0 = block_correlation(m0, TEMPS)
+    assert abs(b0.rho) < 0.03 and abs(b0.delta.mean()) < 0.03
+
+
+def test_window_sizes_and_override():
+    assert ShiftParams().window_sizes == (2, 3, 4)
+    assert ShiftParams(window=3).window_sizes == (3,)           # single size overrides windows
+    assert ShiftParams(windows=(4, 2)).window_sizes == (2, 4)
+    with pytest.raises(ValueError):
+        ShiftParams(windows=(0, 2)).validate()
+
+
+def test_multi_window_scan(limma_engine, sim_series):
+    mats, truth = sim_series
+    fits = fit_series(limma_engine, mats, TEMPS, ["C1_vs_Ctl"], paired=True)
+    rho = adjacent_correlation(fits, TEMPS)
+    t1, w1 = shift_test(fits, TEMPS, ["C1_vs_Ctl"], ShiftParams(window=2), rho)
+    t3, w3 = shift_test(fits, TEMPS, ["C1_vs_Ctl"], ShiftParams(), rho)
+    assert set(w3["size"]) == {2, 3, 4} and set(w1["size"]) == {2}
+    assert (t1["dd_peak"] == t1["dd_best"]).all()               # single size: peak = best window
+    sub = t3.dropna(subset=["dd_best"])
+    assert (sub["dd_peak"].abs() >= sub["dd_best"].abs() - 1e-12).all()
+    true = set(truth.loc[truth.dTm > 0, "name"])
+    h1, h3 = set(t1.loc[t1.hit, "name"]), set(t3.loc[t3.hit, "name"])
+    assert len(h3 & true) >= len(h1 & true) - 2                 # no loss of power
+    assert len(h3 - true) / max(len(h3), 1) <= 0.15
+
+
+def test_shared_component_flags_common_pattern(limma_engine):
+    from olympus.shared import SharedParams, delta_matrix, shared_component
+    mats, truth = simulate_intensity_series(n_prot=800, seed=7, shared_frac=0.08)
+    fits = fit_series(limma_engine, mats, TEMPS, ["C1_vs_Ctl"], paired=True)
+    names = sorted(mats["T1"].imputed.index)
+    sc = shared_component(delta_matrix(fits, TEMPS, "C1_vs_Ctl", names), "C1_vs_Ctl", SharedParams(n_null=50))
+    assert sc.strong and sc.variance_explained > 1.5 * sc.null_q95
+    assert sc.loadings.idxmax() in ("T5", "T6", "T11")
+    flags = sc.flags(0.7)
+    shared = set(truth.loc[truth.shared, "name"])
+    shifted = set(truth.loc[truth.dTm > 0, "name"])
+    assert flags.reindex(list(shared)).mean() >= 0.6
+    assert flags.reindex(list(shifted)).mean() <= 0.25
+    # without the planted pattern: no strong component, nothing flagged
+    m0, _ = simulate_intensity_series(n_prot=800, seed=7)
+    f0 = fit_series(limma_engine, m0, TEMPS, ["C1_vs_Ctl"], paired=True)
+    s0 = shared_component(delta_matrix(f0, TEMPS, "C1_vs_Ctl", names), "C1_vs_Ctl", SharedParams(n_null=50))
+    assert not s0.strong and not s0.flags(0.7).any()

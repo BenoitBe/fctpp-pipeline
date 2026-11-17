@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from .engine import fit_series, load_limma
+from .engine import BlockCorrelation, block_correlation, fit_series, load_limma
 from .matrices import has_matrices, load_series_matrices
+from .shared import SharedParams, component_table, delta_matrix, shared_component
 from .shift import (ShiftParams, adjacent_correlation, fits_to_long, permutation_null,
                     shift_test, swap_patterns)
 from .tpp import CallParams, TPPResult, run_tpp
@@ -30,7 +31,18 @@ class ShiftResult:
     fits: dict
     legacy_paired: bool
     n_patterns: int
+    block: BlockCorrelation | None = None
+    paired_reason: str = ""
+    shared: dict = field(default_factory=dict)          # contrast -> SharedComponent | None
+    shared_params: SharedParams | None = None
+    shared_table: pd.DataFrame | None = None
     notes: list[str] = field(default_factory=list)
+
+    def shared_flags(self, contrast: str) -> pd.Series:
+        sc = self.shared.get(contrast)
+        if sc is None or self.shared_params is None:
+            return pd.Series(dtype=bool)
+        return sc.flags(self.shared_params.r_threshold)
 
 
 @contextmanager
@@ -87,9 +99,18 @@ def run_shift_analysis(cfg: dict, loaded, temps, res: TPPResult, mode: str) -> S
         return _skip(str(e))
 
     cp = res.call_params
+    win, wins = st.get("window"), st.get("windows")
+    if isinstance(wins, (int, float)):
+        wins = [int(wins)]
+    if win:                                   # explicit single size wins
+        win_kw = {"window": int(win)}
+    elif wins:
+        win_kw = {"window": None, "windows": tuple(int(w) for w in wins)}
+    else:                                     # legacy behaviour: call.min_consecutive
+        win_kw = {"window": int(cp.min_consecutive)}
     params = ShiftParams(
         baseline=str(st.get("baseline", "none")),
-        window=int(st.get("window") or cp.min_consecutive),
+        **win_kw,
         alpha=float(st.get("alpha", 0.05)),
         fc_cutoff=float(st.get("fc_cutoff") if st.get("fc_cutoff") is not None else cp.fc_cutoff),
         use_adjacent_correlation=bool(st.get("use_adjacent_correlation", True)),
@@ -103,17 +124,56 @@ def run_shift_analysis(cfg: dict, loaded, temps, res: TPPResult, mode: str) -> S
     uni = set(universe)
     contrasts = list(res.contrasts)
 
-    fits = fit_series(limma, mats, list(temps.ids), contrasts, params.paired, proteins=uni)
+    # pairing: forced, or decided from the measured within-lysate correlation
+    block = block_correlation(mats, list(temps.ids), uni)
+    pv = params.paired
+    if pv in (True, "true", "True"):
+        paired_flag, reason = True, "forced (paired: true); " + block.describe()
+        if not block.complete:
+            raise ValueError("shift_test.paired: true but the lysate blocks are incomplete")
+    elif pv in (False, "false", "False"):
+        paired_flag, reason = False, "forced (paired: false); " + block.describe()
+    else:
+        paired_flag = block.decide()
+        reason = ("auto: " + ("paired" if paired_flag else "unpaired") + " — " + block.describe())
+    log.info("Pairing %s", reason)
+
+    fits = fit_series(limma, mats, list(temps.ids), contrasts, paired_flag, proteins=uni)
     paired_used = all(f.paired for f in fits.values())
     rho = adjacent_correlation(fits, list(temps.ids))
     table, windows = shift_test(fits, list(temps.ids), contrasts, params, rho, universe)
+
+    # shared condition x temperature component (diagnostic, flags hits)
+    shp = SharedParams(enabled=bool(st.get("shared_component", True)),
+                       r_threshold=float(st.get("shared_r_threshold", 0.7)),
+                       n_null=int(st.get("shared_n_null", 100)), min_ratio=float(st.get("shared_min_ratio", 1.5)),
+                       seed=int(st.get("seed", 42)))
+    shared, shared_tab = {}, None
+    if shp.enabled:
+        shp.validate()
+        for c in contrasts:
+            shared[c] = shared_component(delta_matrix(fits, list(temps.ids), c, universe), c, shp)
+        r_all = pd.concat([sc.r.rename("r_shared").to_frame().assign(contrast=c)
+                           for c, sc in shared.items() if sc is not None]) if any(shared.values()) else None
+        if r_all is not None:
+            table = table.merge(r_all.reset_index(), on=["contrast", "name"], how="left")
+            sig = table["contrast"].map({c: bool(sc is not None and sc.strong) for c, sc in shared.items()})
+            table["shared_profile"] = (table["r_shared"].abs() >= shp.r_threshold) & sig.fillna(False).astype(bool)
+        else:
+            table["r_shared"], table["shared_profile"] = np.nan, False
+        table["hit_specific"] = table["hit"] & ~table["shared_profile"]
+        shared_tab = component_table(shared, shp, {c: set(table.loc[(table.contrast == c) & table.hit, "name"])
+                                                   for c in contrasts})
     ann = res.data.groupby("name")[[c for c in ("Genes", "First.Protein.Description")
                                     if c in res.data.columns]].first()
     if len(ann.columns):
         table = table.merge(ann, left_on="name", right_index=True, how="left")
-    log.info("Shift test (%s fit, baseline %s, window %d): %s", "paired" if paired_used else "unpaired",
-             params.baseline, params.window,
-             ", ".join(f"{c}: {int(table[(table.contrast == c)].hit.sum())} hits" for c in contrasts))
+    log.info("Shift test (%s fit, baseline %s, %s): %s", "paired" if paired_used else "unpaired",
+             params.baseline, params.describe_windows(),
+             ", ".join(f"{c}: {int(table[(table.contrast == c)].hit.sum())} hits"
+                       + (f" ({int(table[(table.contrast == c)].hit_specific.sum())} not following the "
+                          f"shared component)" if "hit_specific" in table.columns else "")
+                       for c in contrasts))
 
     legacy_paired = _deimos_design_paired(getattr(loaded, "methods", None))
     fdr_rows, n_patterns = [], 0
@@ -134,7 +194,7 @@ def run_shift_analysis(cfg: dict, loaded, temps, res: TPPResult, mode: str) -> S
         kw = dict(max_patterns=int(st.get("max_patterns", 64)), seed=int(st.get("seed", 42)), proteins=uni)
         with _quiet("olympus.tpp"):
             null_shift = permutation_null(limma, mats, list(temps.ids), contrasts, eval_shift,
-                                          params.paired, **kw)
+                                          paired_flag, **kw)
             fits_leg = fit_series(limma, mats, list(temps.ids), contrasts, legacy_paired, proteins=uni)
             obs_leg = {c: eval_legacy(fits_leg, c) for c in contrasts}
             null_leg = permutation_null(limma, mats, list(temps.ids), contrasts, eval_legacy,
@@ -158,7 +218,26 @@ def run_shift_analysis(cfg: dict, loaded, temps, res: TPPResult, mode: str) -> S
                          "(rounding of matrices/ or different fit)", c, legacy_from_deimos[c], obs_leg[c])
     fdr = pd.DataFrame(fdr_rows)
     return ShiftResult(table.sort_values(["contrast", "p_protein"], kind="mergesort").reset_index(drop=True),
-                       windows, fdr, params, paired_used, rho, fits, legacy_paired, n_patterns)
+                       windows, fdr, params, paired_used, rho, fits, legacy_paired, n_patterns,
+                       block=block, paired_reason=reason, shared=shared, shared_params=shp if shp.enabled else None,
+                       shared_table=shared_tab)
+
+
+def annotate_legacy_hits(sr: ShiftResult | None, hits: pd.DataFrame) -> pd.DataFrame:
+    """Add r_shared / shared_profile to the legacy-rule hits (same refits as the shift test)."""
+    if sr is None or not sr.shared or hits is None or hits.empty:
+        return hits
+    out = hits.copy()
+    r, flag = [], []
+    for c, n in zip(out["contrast"], out["name"]):
+        sc = sr.shared.get(c)
+        rv = float(sc.r.get(n, np.nan)) if sc is not None else np.nan
+        r.append(rv)
+        flag.append(bool(sc is not None and sc.strong and np.isfinite(rv)
+                         and abs(rv) >= sr.shared_params.r_threshold))
+    out["r_shared"] = np.round(r, 3)
+    out["shared_profile"] = flag
+    return out
 
 
 def summary_columns(sr: ShiftResult | None, res: TPPResult) -> pd.DataFrame:
@@ -167,7 +246,19 @@ def summary_columns(sr: ShiftResult | None, res: TPPResult) -> pd.DataFrame:
     if sr is None:
         return s
     s["shift_hits"] = s["contrast"].map(sr.table.groupby("contrast")["hit"].sum()).fillna(0).astype(int)
+    if "hit_specific" in sr.table.columns:
+        s["shift_hits_not_shared"] = s["contrast"].map(
+            sr.table.groupby("contrast")["hit_specific"].sum()).fillna(0).astype(int)
     s["shift_min_q"] = s["contrast"].map(sr.table.groupby("contrast")["q_protein"].min()).round(4)
+    if sr.shared:
+        s["shared_component_share"] = s["contrast"].map(
+            {c: (round(sc.variance_explained, 3) if sc is not None else None) for c, sc in sr.shared.items()})
+        s["shared_component_p"] = s["contrast"].map(
+            {c: (round(sc.p_value, 3) if sc is not None else None) for c, sc in sr.shared.items()})
+        lh = annotate_legacy_hits(sr, res.hits)
+        if lh is not None and "shared_profile" in lh.columns:
+            s["hits_shared_profile"] = s["contrast"].map(lh.groupby("contrast")["shared_profile"].sum()) \
+                .fillna(0).astype(int)
     if len(sr.fdr):
         leg = sr.fdr[sr.fdr["rule"].str.startswith("legacy")].set_index("contrast")
         s["legacy_rule_fdr_estimate"] = s["contrast"].map(leg["fdr_estimate"])
@@ -177,15 +268,17 @@ def summary_columns(sr: ShiftResult | None, res: TPPResult) -> pd.DataFrame:
 def methods_rows(sr: ShiftResult) -> list[tuple[str, str, str]]:
     p = sr.params
     rho_txt = ", ".join(f"{a}-{b}: {v:.2f}" for (a, b), v in sr.rho.items())
-    return [
+    rows = [
+        ("Pairing", "paired (lysate as block)" if sr.paired_used else "unpaired", sr.paired_reason),
         ("Shift test", f"{'paired' if sr.paired_used else 'unpaired'} refit, baseline {p.baseline}, "
-                       f"window {p.window}",
+                       f"{p.describe_windows()}",
          "Deimos limma (limma_ebayes.py) refitted at each temperature on matrices/log2_imputed.tsv"
          + (" with the lysate (replicate) as block: ~0 + condition + replicate" if sr.paired_used else
             ": ~0 + condition")
-         + f". Window statistic D = mean(Δ over {p.window} adjacent temperatures) − baseline "
-           f"({p.baseline}); variance includes the adjacent-temperature correlation; Welch–Satterthwaite df."),
-        ("Shift test FDR", f"Simes over windows, BH over proteins, q ≤ {p.alpha}, |D| ≥ {p.fc_cutoff}",
+         + f". Window statistic D = mean(Δ over w adjacent temperatures, w ∈ {list(p.window_sizes)}) − "
+           f"baseline ({p.baseline}); variance includes the adjacent-temperature correlation; "
+           f"Welch–Satterthwaite df."),
+        ("Shift test FDR", f"Simes over windows, BH over proteins, q ≤ {p.alpha}, |dd_peak| ≥ {p.fc_cutoff}",
          "Protein-level false discovery rate, per contrast, over the proteins retained by the presence filter"),
         ("Localisation check", ("off" if p.localisation_p is None or p.baseline == "median"
                                 else f"best window vs profile median, p ≤ {p.localisation_p}"),
@@ -195,5 +288,17 @@ def methods_rows(sr: ShiftResult) -> list[tuple[str, str, str]]:
         ("Permutations", f"{sr.n_patterns} within-lysate swap pattern(s) per contrast",
          "A/B labels swapped in a subset of lysates, the same at every temperature (identity and full "
          "swap excluded; a pattern and its complement are equivalent). FDR estimate = mean null hits / "
-         "observed hits. Indicative with few lysates; partial swaps keep part of a true signal (conservative)."),
+         "observed hits. Indicative with few lysates; partial swaps keep part of a true signal (conservative). "
+         "Blind to effects shared by every lysate: see the shared component."),
     ]
+    if sr.shared_params is not None:
+        txt = "; ".join(f"{c}: " + ("not estimated" if sc is None else
+                                    f"{100 * sc.variance_explained:.1f} % (null 95 % {100 * sc.null_q95:.1f} %, "
+                                    f"p = {sc.p_value:.2g}, {sc.status})") for c, sc in sr.shared.items())
+        rows.append(("Shared component",
+                     f"1st SVD component of the protein × temperature Δ matrix; flag |r| ≥ "
+                     f"{sr.shared_params.r_threshold:g} when strong (p ≤ 0.05 and ≥ "
+                     f"{sr.shared_params.min_ratio:g}× the null 95 % quantile)",
+                     "Effect common to many proteins (handling per temperature, solvent, complexes); "
+                     "sign-flip null; hits following it are flagged shared_profile, not removed. " + txt))
+    return rows

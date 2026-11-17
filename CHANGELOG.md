@@ -15,6 +15,17 @@
   `shift_test_plots.pdf`; new Summary columns `shift_hits` and `shift_min_q`.
 - Intensity simulator (`olympus.synthetic.simulate_intensity_series`,
   `write_intensity_runs`) and validation script `docs/validation/simulate_shift.py`.
+- **Multi-window scan**: `shift_test.windows: [2, 3, 4]` (default), all windows in one
+  Simes combination; the fc cutoff applies to `dd_peak`. `window: N` keeps a single size.
+- **Data-driven pairing**: `paired: auto` uses the lysate block only when the
+  within-lysate residual correlation is positive (one-sided test over temperatures);
+  decision reported in `Methods` (`Pairing`).
+- **Shared component diagnostic**: first SVD component of the protein × temperature
+  log2FC matrix, sign-flip null, strength criterion (`shared_min_ratio`); per protein
+  `r_shared`, flags `shared_profile` and `hit_specific` (shift test) and
+  `r_shared` / `shared_profile` on the legacy hits; sheet `Shared_component`, plot page,
+  Summary columns `shift_hits_not_shared`, `shared_component_share`,
+  `shared_component_p`, `hits_shared_profile`.
 - Dependency: scipy. CI clones Deimos for the engine.
 
 

@@ -143,14 +143,40 @@ def test_cli_shift_test_end_to_end(tmp_path, limma_engine):
                  "--set", "plots.plot3d=false", "--set", f"shift_test.deimos_dir={os.environ.get('DEIMOS_DIR', '')}"])
     assert code == 0
     wb = openpyxl.load_workbook(out / "Olympus_Results.xlsx", read_only=True)
-    assert {"Shift_test", "FDR_estimates"} <= set(wb.sheetnames)
+    assert {"Shift_test", "FDR_estimates", "Shared_component"} <= set(wb.sheetnames)
     st = pd.read_csv(out / "shift_test.csv")
-    assert {"q_protein", "p_localisation", "localised", "hit"} <= set(st.columns)
+    assert {"q_protein", "p_localisation", "localised", "hit", "window_size", "dd_peak",
+            "r_shared", "shared_profile", "hit_specific"} <= set(st.columns)
+    assert set(pd.read_csv(out / "shift_windows.csv")["size"]) == {2, 3, 4}
     hits = set(st.loc[(st.contrast == "C1_vs_Ctl") & st.hit, "name"])
     assert hits & set(truth.loc[truth.dTm >= 4, "name"])
     assert (out / "shift_test_plots.pdf").exists()
     summ = pd.read_excel(out / "Olympus_Results.xlsx", sheet_name="Summary")
-    assert {"shift_hits", "legacy_rule_fdr_estimate"} <= set(summ.columns)
+    assert {"shift_hits", "shift_hits_not_shared", "shared_component_share",
+            "legacy_rule_fdr_estimate"} <= set(summ.columns)
+    meth = pd.read_excel(out / "Olympus_Results.xlsx", sheet_name="Methods", header=None)
+    pairing = meth[meth.iloc[:, 0] == "Pairing"]
+    assert len(pairing) == 1 and "paired" in str(pairing.iloc[0, 1])
+
+
+def test_cli_flags_shared_component(tmp_path, limma_engine):
+    import os
+    from olympus.synthetic import simulate_intensity_series, write_intensity_runs
+    mats, truth = simulate_intensity_series(n_prot=400, seed=4, shared_frac=0.15)
+    root = write_intensity_runs(tmp_path / "runs", mats, limma_engine)
+    out = tmp_path / "out"
+    assert main(["analyze", "--deimos-root", str(root), "-o", str(out), "--no-plots",
+                 "--set", "shift_test.permutations=false", "--set", "shift_test.shared_n_null=30",
+                 "--set", f"shift_test.deimos_dir={os.environ.get('DEIMOS_DIR', '')}"]) == 0
+    sc = pd.read_excel(out / "Olympus_Results.xlsx", sheet_name="Shared_component").set_index("contrast")
+    assert sc.loc["C1_vs_Ctl", "status"] == "strong"
+    st = pd.read_csv(out / "shift_test.csv")
+    c1 = st[st.contrast == "C1_vs_Ctl"].set_index("name")
+    planted = truth.loc[truth.shared, "name"]
+    assert c1.loc[planted, "shared_profile"].mean() >= 0.5
+    assert not (c1["hit_specific"] & c1["shared_profile"]).any()
+    hits = pd.read_csv(out / "TPP_hits.csv")
+    assert {"r_shared", "shared_profile"} <= set(hits.columns)
 
 
 def test_shift_test_skipped_without_matrices(deimos_root, tmp_path):

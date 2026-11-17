@@ -68,7 +68,7 @@ def analyze(cfg: dict) -> dict:
     res.notes.extend(loaded.warnings)
 
     outputs: dict[str, object] = {}
-    from .shift_pipeline import methods_rows, run_shift_analysis, summary_columns
+    from .shift_pipeline import annotate_legacy_hits, methods_rows, run_shift_analysis, summary_columns
     sr = run_shift_analysis(cfg, loaded, temps, res, mode)
     outputs["shift"] = sr
     extra, mrows = [], []
@@ -76,7 +76,10 @@ def analyze(cfg: dict) -> dict:
         extra = [("Shift_test", sr.table)]
         if len(sr.fdr):
             extra.append(("FDR_estimates", sr.fdr))
+        if sr.shared_table is not None and len(sr.shared_table):
+            extra.append(("Shared_component", sr.shared_table))
         mrows = methods_rows(sr)
+        res.hits = annotate_legacy_hits(sr, res.hits)
     run_info = {"input_mode": mode, "input": source, "warnings": loaded.warnings, "config": cfg}
     outputs["excel"] = write_workbook(res, out_dir / cfg["output"]["excel"], run_info=run_info,
                                       provenance=loaded.provenance, methods_upstream=loaded.methods,

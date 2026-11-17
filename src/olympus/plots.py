@@ -320,6 +320,37 @@ def shift_pdf(sr, res: TPPResult, out_pdf: str | Path, *, label_column: str | No
             pdf.savefig(fig)
             plt.close(fig)
 
+            sc = (getattr(sr, "shared", None) or {}).get(c)
+            if sc is not None:
+                thr = sr.shared_params.r_threshold
+                fig, (a1, a2) = plt.subplots(1, 2, figsize=(9.5, 3.4), gridspec_kw={"width_ratios": [1.6, 1]})
+                lx = np.array([temps.x(t) for t in sc.loadings.index])
+                a1.axhline(0, color=INK_2, lw=0.6)
+                a1.plot(lx, sc.loadings.to_numpy(), color=DOWN if sc.strong else INK_2,
+                        lw=1.6, marker="o", ms=3.5)
+                _set_temperature_axis(a1, temps)
+                a1.set_ylabel("loading (1st component)")
+                a1.set_title(f"Shared component: {100 * sc.variance_explained:.1f} % of the Δ variance "
+                             f"(sign-flip null 95 %: {100 * sc.null_q95:.1f} %, p = {sc.p_value:.2g}) — {sc.status}",
+                             fontsize=8)
+                rv = sc.r.dropna()
+                a2.hist(rv, bins=np.linspace(-1, 1, 41), color=NEUTRAL, edgecolor="white", linewidth=0.5)
+                for x0 in (-thr, thr):
+                    a2.axvline(x0, color=INK_2, lw=0.7, ls="--")
+                hits_c = tab.loc[tab["hit"], "name"]
+                n_sh = int(sc.flags(thr).reindex(hits_c).fillna(False).sum())
+                a2.set_xlabel("r with the shared pattern (per protein)")
+                a2.set_ylabel("proteins")
+                a2.set_title(f"{int((rv.abs() >= thr).sum())} proteins |r| ≥ {thr:g}; "
+                             + (f"{n_sh}/{len(hits_c)} hits flagged" if sc.strong else "no flag (component not strong)"),
+                             fontsize=8)
+                fig.suptitle(f"{c} — effect common to many proteins? A thermal shift is specific; a "
+                             f"pattern shared by the proteome points to handling or a non-specific effect",
+                             fontsize=8.5, fontweight="bold")
+                fig.tight_layout(rect=(0, 0, 1, 0.92))
+                pdf.savefig(fig)
+                plt.close(fig)
+
             sel = tab.head(top)
             if sel.empty:
                 continue
@@ -348,9 +379,12 @@ def shift_pdf(sr, res: TPPResult, out_pdf: str | Path, *, label_column: str | No
                 ax.errorbar(xs, d, yerr=1.96 * se, color=color, lw=1.1, marker="o", ms=2.8,
                             elinewidth=0.6, capsize=1.5)
                 star = " ★" if row["hit"] else ""
+                shared_txt = ""
+                if "r_shared" in row.index and np.isfinite(row.get("r_shared", np.nan)):
+                    shared_txt = f" · r={row['r_shared']:+.2f}" + (" shared" if row.get("shared_profile") else "")
                 ax.set_title(f"{lab_map.get(n, n)} ({n}){star}", fontsize=7)
-                ax.text(0.02, 0.96, f"q={row['q_protein']:.2g} · {row['best_window']} · D={row['dd_best']:+.2f}",
-                        transform=ax.transAxes, fontsize=5.5, color=INK_2, va="top")
+                ax.text(0.02, 0.96, f"q={row['q_protein']:.2g} · {row['best_window']} · D={row['dd_best']:+.2f}"
+                        + shared_txt, transform=ax.transAxes, fontsize=5.5, color=INK_2, va="top")
             for ax in list(axes.flat)[len(sel):]:
                 ax.set_visible(False)
             for ax in axes[-1, :]:
@@ -358,7 +392,7 @@ def shift_pdf(sr, res: TPPResult, out_pdf: str | Path, *, label_column: str | No
             for ax in axes[:, 0]:
                 ax.set_ylabel("log2 FC (± 95 % CI)")
             fig.suptitle(f"{c} — top {len(sel)} shift-test candidates (dashed: baseline, shaded: best window, "
-                         f"★ hit)", fontsize=9, fontweight="bold")
+                         f"★ hit, 'shared': follows the shared component)", fontsize=9, fontweight="bold")
             fig.tight_layout(rect=(0, 0, 1, 0.94))
             pdf.savefig(fig)
             plt.close(fig)

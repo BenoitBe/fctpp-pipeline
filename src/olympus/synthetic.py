@@ -128,7 +128,8 @@ SIM_CONDS = ["C2", "C1", "Ctl"]
 def simulate_intensity_series(n_prot: int = 2000, n_lysates: int = 3, seed: int = 0,
                               frac_shift: float = 0.04, frac_offset: float = 0.02,
                               noise: float = 0.26, lysate_sd: float = 0.25, realistic: bool = True,
-                              shift_sizes=(2.0, 4.0, 6.0)):
+                              shift_sizes=(2.0, 4.0, 6.0), shared_frac: float = 0.0,
+                              shared_pattern=None):
     """Lysate-treated TPP intensities, one matrix per temperature.
 
     soluble fraction f(T) = 1 / (1 + exp((T − Tm) / s)), Tm ~ N(52, 6) °C, s ~ U(1.5, 3);
@@ -140,6 +141,11 @@ def simulate_intensity_series(n_prot: int = 2000, n_lysates: int = 3, seed: int 
     realistic=True: protein-specific variances (scaled inverse χ², d0 = 2, as limma
     estimates on real TPP runs), t5 noise, ~3 % left-censored values per temperature
     imputed from a narrow normal under the detection limit (QRILC-like).
+
+    ``shared_frac`` > 0 adds to C1, on that fraction of the unshifted proteins, a
+    condition × temperature pattern common to all of them (``shared_pattern``, one
+    value per temperature, scaled by a protein loading U(0.6, 1.4)): a handling
+    artefact that the within-lysate permutations cannot see.
 
     Returns (matrices: dict temperature → TemperatureMatrix, truth: DataFrame).
     """
@@ -161,6 +167,13 @@ def simulate_intensity_series(n_prot: int = 2000, n_lysates: int = 3, seed: int 
     offset = np.zeros(n_prot)
     rest = np.setdiff1d(np.arange(n_prot), shifted)
     offset[rng.choice(rest, int(frac_offset * n_prot), replace=False)] = 0.8
+    shared_load = np.zeros(n_prot)
+    if shared_frac > 0:
+        pattern = np.asarray(shared_pattern if shared_pattern is not None else
+                             [0, 0, 0.1, 0, 0.8, 0.9, -0.4, 0.6, 0.3, 0.4, 0.8, 0], float)
+        pool = np.setdiff1d(np.arange(n_prot), np.flatnonzero((dtm > 0) | (offset > 0)))
+        pick = rng.choice(pool, int(shared_frac * n_prot), replace=False)
+        shared_load[pick] = rng.uniform(0.6, 1.4, len(pick))
     lys0 = rng.normal(0, lysate_sd, (n_prot, n_lysates))
     mats = {}
     for k, (t, tc) in enumerate(zip(temps, SIM_TEMPS_C)):
@@ -173,6 +186,8 @@ def simulate_intensity_series(n_prot: int = 2000, n_lysates: int = 3, seed: int 
                 y = base + np.log2(f + 0.05) + lys + sd_p * eps
                 if cond == "C2":
                     y = y + offset
+                if cond == "C1" and shared_frac > 0:
+                    y = y + shared_load * pattern[k]
                 lab = f"Sple-{k + 1}{'BCDEFGHIJKLMNOPQ'[L * 3 + SIM_CONDS.index(cond)]}"
                 cols[lab] = y
                 rows.append({"label": lab, "condition": cond, "replicate": str(L + 1)})
@@ -184,7 +199,7 @@ def simulate_intensity_series(n_prot: int = 2000, n_lysates: int = 3, seed: int 
             obs = imp.mask(low)
             imp = imp.mask(low, rng.normal(lod - 0.8, 0.3, imp.shape))
         mats[t] = TemperatureMatrix(t, imp, obs, pd.DataFrame(rows), Path("."))
-    truth = pd.DataFrame({"name": names, "dTm": dtm, "offset": offset})
+    truth = pd.DataFrame({"name": names, "dTm": dtm, "offset": offset, "shared": shared_load > 0})
     return mats, truth
 
 

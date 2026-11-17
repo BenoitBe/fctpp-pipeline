@@ -32,19 +32,25 @@ p-value ≤ localisation_p). A constant offset is significant everywhere but nev
 localised, so it is not called a shift.
 
 Validation (docs/validation/simulate_shift.py, realistic noise: protein-specific
-variances d0 = 2, t5 noise, censored + imputed low values; 3 lysates): false
-discovery proportion ≈ 3–4 %, sensitivity 0.67 for ΔTm = 2 °C and ≥ 0.89 for
-ΔTm ≥ 4 °C, 1–3 of 40 constant offsets called (the legacy rule calls ~35 of 40).
+variances d0 = 2, t5 noise, censored + imputed low values; 3 lysates, windows
+2/3/4): false discovery proportion ≈ 2 %, sensitivity 0.75 for ΔTm = 2 °C and
+≥ 0.93 for ΔTm ≥ 4 °C, < 1 of 40 constant offsets called (the legacy rule calls
+~33 of 40).
 
 Var(D_w) = [Σ SE_T² + 2 Σ ρ_{T,T+1} SE_T SE_{T+1}] / w² + Var(baseline), where
 ρ is the consensus correlation of residuals between adjacent temperatures for
 the same lysate (estimated across proteins, floored at 0). Welch–Satterthwaite
 degrees of freedom; two-sided t p-value per window.
 
+Several window sizes (``windows: [2, 3, 4]``): a narrow shift is best seen on 2
+temperatures, a broad one (large ΔTm, shallow melting curve) on 3–4; every window
+of every size enters the same Simes combination.
+
 Protein level: the window p-values are combined with Simes (valid under the
 positive dependence of overlapping windows), then Benjamini–Hochberg across
-proteins, per contrast. A protein is a shift hit when q ≤ alpha and the best
-window has |D_w| ≥ fc_cutoff.
+proteins, per contrast. A protein is a shift hit when q ≤ alpha and the effect
+size ``dd_peak`` reaches fc_cutoff: the largest same-sign |D| among the windows
+lying inside the best window (= |D| of the best window with a single size).
 
 Permutations
 ------------
@@ -79,18 +85,29 @@ BASELINES = ("median", "lowest", "none")
 @dataclass
 class ShiftParams:
     baseline: str = "none"
-    window: int = 2
+    window: int | None = None                # single window size; when set, overrides ``windows``
+    windows: tuple[int, ...] = (2, 3, 4)     # window sizes combined by Simes
     alpha: float = 0.05
     fc_cutoff: float = 0.6
     use_adjacent_correlation: bool = True
     paired: str = "auto"
     localisation_p: float | None = 0.01   # with baseline none/lowest; None disables the check
 
+    @property
+    def window_sizes(self) -> tuple[int, ...]:
+        if self.window is not None:
+            return (int(self.window),)
+        return tuple(sorted({int(w) for w in self.windows})) if self.windows else (2,)
+
+    def describe_windows(self) -> str:
+        ws = self.window_sizes
+        return f"window {ws[0]}" if len(ws) == 1 else "windows " + "/".join(map(str, ws))
+
     def validate(self) -> None:
         if self.baseline not in BASELINES:
             raise ValueError(f"shift_test.baseline must be one of {BASELINES}")
-        if self.window < 1:
-            raise ValueError("shift_test.window must be >= 1")
+        if (self.window is not None and int(self.window) < 1) or any(int(w) < 1 for w in (self.windows or ())):
+            raise ValueError("shift_test.window(s) must be >= 1")
         if not 0 < self.alpha < 1:
             raise ValueError("shift_test.alpha must be in (0, 1)")
         if self.localisation_p is not None and not 0 < self.localisation_p <= 1:
@@ -194,19 +211,64 @@ def _window_stats(D, SE, dfs, adj, starts, w, base, var_b, df_b):
     return P, DW, SW, DF
 
 
+def _window_grid(temperatures, sizes, baseline):
+    """(size, start, label) of every window, sizes in increasing order."""
+    K = len(temperatures)
+    grid = []
+    for w in sizes:
+        for i in range(K - w + 1):
+            if baseline == "lowest" and i == 0:
+                continue
+            lab = f"{temperatures[i]}-{temperatures[i + w - 1]}" if w > 1 else temperatures[i]
+            grid.append((w, i, lab))
+    return grid
+
+
+def _all_windows(D, SE, dfs, adj, grid, base, var_b, df_b):
+    """Window statistics for a grid mixing several sizes (columns in grid order)."""
+    shape = (D.shape[0], len(grid))
+    P, DW, SW, DF = (np.full(shape, np.nan) for _ in range(4))
+    for w in sorted({g[0] for g in grid}):
+        cols = [k for k, g in enumerate(grid) if g[0] == w]
+        starts = [grid[k][1] for k in cols]
+        p, dw, sw, df = _window_stats(D, SE, dfs, adj, starts, w, base, var_b, df_b)
+        P[:, cols], DW[:, cols], SW[:, cols], DF[:, cols] = p, dw, sw, df
+    return P, DW, SW, DF
+
+
+def _peak_within(DW, grid, best, sign):
+    """Largest same-sign |D| among the windows (any size) lying inside each protein's
+    best window, the best window included: the effect size the fc cutoff is applied
+    to (= D of the best window when a single size is used)."""
+    out = np.full(DW.shape[0], np.nan)
+    spans = [(g[1], g[1] + g[0]) for g in grid]
+    for i, b in enumerate(best):
+        if not np.isfinite(sign[i]) or sign[i] == 0:
+            continue
+        sb, eb = spans[b]
+        inside = [k for k, (s0, e0) in enumerate(spans) if s0 >= sb and e0 <= eb]
+        vals = DW[i, inside] * sign[i]
+        vals = vals[np.isfinite(vals)]
+        out[i] = sign[i] * vals.max() if len(vals) else DW[i, b]
+    return out
+
+
 def shift_test(fits: dict[str, TemperatureFit], temperatures: list[str], contrasts: list[str],
                params: ShiftParams, rho: dict | None = None,
                universe: list[str] | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Protein-level table (one row per contrast × protein) and window table."""
     params.validate()
     names = list(universe or sorted(set().union(*[set(fits[t].proteins) for t in temperatures])))
-    K, w = len(temperatures), params.window
+    K = len(temperatures)
+    sizes = tuple(w for w in params.window_sizes if w <= K - (1 if params.baseline == "lowest" else 0))
+    if not sizes:
+        raise ValueError(f"shift_test: no window size fits {K} temperatures")
     dfs = np.array([fits[t].df_total for t in temperatures])
     rho = rho or {}
     adj = np.array([rho.get((a, b), 0.0) for a, b in zip(temperatures[:-1], temperatures[1:])]) \
         if params.use_adjacent_correlation else np.zeros(max(K - 1, 0))
-    starts = [i for i in range(K - w + 1) if not (params.baseline == "lowest" and i == 0)]
-    labels = [f"{temperatures[i]}-{temperatures[i + w - 1]}" if w > 1 else temperatures[i] for i in starts]
+    grid = _window_grid(temperatures, sizes, params.baseline)
+    labels = [g[2] for g in grid]
     check_loc = params.localisation_p is not None and params.baseline != "median"
     prot_rows, win_rows = [], []
     rows = np.arange(len(names))
@@ -215,30 +277,34 @@ def shift_test(fits: dict[str, TemperatureFit], temperatures: list[str], contras
         SE = _aligned(fits, temperatures, names, "se", j)
         kp = np.isfinite(D).sum(1)
         base, var_b, df_b = _baseline(D, SE, dfs, params.baseline)
-        P, DW, SW, DF = _window_stats(D, SE, dfs, adj, starts, w, base, var_b, df_b)
-        for k, lab in enumerate(labels):
+        P, DW, SW, DF = _all_windows(D, SE, dfs, adj, grid, base, var_b, df_b)
+        for k, (w, _, lab) in enumerate(grid):
             ok = np.isfinite(P[:, k])
             win_rows.append(pd.DataFrame({"contrast": c, "name": np.array(names)[ok], "window": lab,
-                                          "dd": DW[ok, k], "se": SW[ok, k], "df": DF[ok, k], "p": P[ok, k]}))
+                                          "size": w, "dd": DW[ok, k], "se": SW[ok, k], "df": DF[ok, k],
+                                          "p": P[ok, k]}))
         p_prot = simes(P)
         q = bh(p_prot)
         anyp = np.isfinite(P).any(1)
         best = np.where(anyp, np.argmin(np.where(np.isfinite(P), P, np.inf), axis=1), 0)
+        dd_best = np.where(anyp, DW[rows, best], np.nan)
+        dd_peak = _peak_within(DW, grid, best, np.sign(dd_best))
         tab = pd.DataFrame({
             "contrast": c, "name": names, "n_temperatures": kp, "baseline": base,
             "best_window": [labels[b] if anyp[i] else None for i, b in enumerate(best)],
-            "dd_best": np.where(anyp, DW[rows, best], np.nan),
+            "window_size": np.where(anyp, [grid[b][0] for b in best], 0),
+            "dd_best": dd_best, "dd_peak": np.where(anyp, dd_peak, np.nan),
             "se_best": np.where(anyp, SW[rows, best], np.nan),
             "p_best_window": np.where(anyp, P[rows, best], np.nan), "n_windows": np.isfinite(P).sum(1),
             "p_protein": p_prot, "q_protein": q,
         })
         tab["direction"] = np.where(tab["dd_best"] > 0, "up", np.where(tab["dd_best"] < 0, "down", None))
-        hit = (tab["q_protein"] <= params.alpha) & (tab["dd_best"].abs() >= params.fc_cutoff)
+        hit = (tab["q_protein"] <= params.alpha) & (tab["dd_peak"].abs() >= params.fc_cutoff)
         if check_loc:
             # localisation: the detected window must also stand out from the profile median,
             # which rejects constant offsets (handling artefacts, abundance changes)
             mb, mv, mdf = _baseline(D, SE, dfs, "median")
-            Pm, DWm, _, _ = _window_stats(D, SE, dfs, adj, starts, w, mb, mv, mdf)
+            Pm, DWm, _, _ = _all_windows(D, SE, dfs, adj, grid, mb, mv, mdf)
             tab["median_baseline"] = mb
             tab["dd_vs_median"] = np.where(anyp, DWm[rows, best], np.nan)
             tab["p_localisation"] = np.where(anyp, Pm[rows, best], np.nan)
