@@ -129,3 +129,33 @@ def test_init_config(tmp_path):
     assert cfg["call"]["rule"] == "strict"
     assert cfg["input"]["workbook_glob"] == "**/*ProteomicAnalysis_Results*.xlsx"
     assert "prepare" not in cfg
+
+
+# ---------------------------------------------------------------- shift test end to end
+
+def test_cli_shift_test_end_to_end(tmp_path, limma_engine):
+    import os
+    from olympus.synthetic import simulate_intensity_series, write_intensity_runs
+    mats, truth = simulate_intensity_series(n_prot=300, seed=2)
+    root = write_intensity_runs(tmp_path / "runs", mats, limma_engine)
+    out = tmp_path / "out"
+    code = main(["analyze", "--deimos-root", str(root), "-o", str(out), "--min-temperatures", "6",
+                 "--set", "plots.plot3d=false", "--set", f"shift_test.deimos_dir={os.environ.get('DEIMOS_DIR', '')}"])
+    assert code == 0
+    wb = openpyxl.load_workbook(out / "Olympus_Results.xlsx", read_only=True)
+    assert {"Shift_test", "FDR_estimates"} <= set(wb.sheetnames)
+    st = pd.read_csv(out / "shift_test.csv")
+    assert {"q_protein", "p_localisation", "localised", "hit"} <= set(st.columns)
+    hits = set(st.loc[(st.contrast == "C1_vs_Ctl") & st.hit, "name"])
+    assert hits & set(truth.loc[truth.dTm >= 4, "name"])
+    assert (out / "shift_test_plots.pdf").exists()
+    summ = pd.read_excel(out / "Olympus_Results.xlsx", sheet_name="Summary")
+    assert {"shift_hits", "legacy_rule_fdr_estimate"} <= set(summ.columns)
+
+
+def test_shift_test_skipped_without_matrices(deimos_root, tmp_path):
+    out = tmp_path / "o"
+    assert main(["analyze", "--deimos-root", str(deimos_root), "-o", str(out), "--no-plots"]) == 0
+    assert not (out / "shift_test.csv").exists()
+    assert main(["analyze", "--deimos-root", str(deimos_root), "-o", str(tmp_path / "o2"), "--no-plots",
+                 "--set", "shift_test.enabled=true"]) == 1

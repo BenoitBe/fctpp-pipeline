@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+- **Shift test**, a protein-level test with a controlled false discovery rate:
+  - paired refit per temperature with Deimos' limma (`limma_ebayes.py` from
+    `shift_test.deimos_dir` / `DEIMOS_DIR`), reading the Deimos `matrices/` folder;
+  - windows of adjacent temperatures, with the adjacent-temperature correlation in
+    the variance, Simes per protein and BH over proteins;
+  - localisation check against the profile median, which rejects constant offsets.
+- **Permutations within lysates**: FDR estimates for the shift test and for the
+  legacy rule (sheet `FDR_estimates`, column `legacy_rule_fdr_estimate`).
+- Outputs: sheet `Shift_test`, `shift_test.csv`, `shift_windows.csv`,
+  `shift_test_plots.pdf`; new Summary columns `shift_hits` and `shift_min_q`.
+- Intensity simulator (`olympus.synthetic.simulate_intensity_series`,
+  `write_intensity_runs`) and validation script `docs/validation/simulate_shift.py`.
+- Dependency: scipy. CI clones Deimos for the engine.
+
+
 ### Changed
 - **Renamed FC.TPP (Python) → Olympus**, after Olympus Mons. Package `olympus`
   (pip distribution `olympus-tpp`), command `olympus analyze`, results workbook

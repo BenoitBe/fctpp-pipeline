@@ -27,66 +27,18 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from olympus.engine import fit_series, load_limma          # noqa: E402
-from olympus.matrices import TemperatureMatrix             # noqa: E402
+from olympus.synthetic import SIM_TEMPS_C, simulate_intensity_series  # noqa: E402
 from olympus.shift import ShiftParams, adjacent_correlation, fits_to_long, shift_test  # noqa: E402
 from olympus.temperatures import TemperatureSeries         # noqa: E402
 from olympus.tpp import CallParams, FilterParams, run_tpp  # noqa: E402
 
-TEMPS_C = np.linspace(37, 67, 12)
 TEMPS = [f"T{i}" for i in range(1, 13)]
-CONDS = ["C2", "C1", "Ctl"]
+TEMPS_C = SIM_TEMPS_C
 CONTRASTS = ["C2_vs_C1", "C2_vs_Ctl", "C1_vs_Ctl"]
 
 
-def simulate(n_prot=2000, n_lysates=3, seed=0, frac_shift=0.04, frac_offset=0.02,
-             noise=0.26, lysate_sd=0.25, realistic=True):
-    """realistic=True adds what the Gaussian toy lacks, calibrated on the real data:
-    protein-specific variances (scaled inverse chi-square, d0 = 2, as estimated by
-    limma on the TPP runs), t-distributed noise (5 df), and left-censored missing
-    values (below a per-temperature detection limit) imputed from a narrow normal
-    under that limit (QRILC-like)."""
-    rng = np.random.default_rng(seed)
-    names = [f"P{i:05d}" for i in range(n_prot)]
-    base = rng.normal(20, 2, n_prot)
-    tm = rng.normal(52, 6, n_prot)
-    slope = rng.uniform(1.5, 3.0, n_prot)
-    if realistic:
-        d0 = 2.0
-        sd_p = noise * np.sqrt(d0 / rng.chisquare(d0, n_prot)) * 0.6   # median ≈ noise
-        sd_p = np.clip(sd_p, 0.05, 2.0)
-    else:
-        sd_p = np.full(n_prot, noise)
-    dtm = np.zeros(n_prot)
-    shifted = rng.choice(n_prot, int(frac_shift * n_prot), replace=False)
-    dtm[shifted] = rng.choice([2.0, 4.0, 6.0], len(shifted))
-    offset = np.zeros(n_prot)
-    rest = np.setdiff1d(np.arange(n_prot), shifted)
-    off_idx = rng.choice(rest, int(frac_offset * n_prot), replace=False)
-    offset[off_idx] = 0.8
-    lys0 = rng.normal(0, lysate_sd, (n_prot, n_lysates))
-    mats = {}
-    for k, (t, tc) in enumerate(zip(TEMPS, TEMPS_C)):
-        cols, rows = {}, []
-        for L in range(n_lysates):
-            lys = lys0[:, L] * (1 - 0.04 * k) + rng.normal(0, 0.05, n_prot)
-            for cond in CONDS:
-                tmc = tm + (dtm if cond == "C1" else 0.0)
-                f = 1.0 / (1.0 + np.exp((tc - tmc) / slope))
-                eps = (rng.standard_t(5, n_prot) / np.sqrt(5 / 3)) if realistic else rng.normal(0, 1, n_prot)
-                y = base + np.log2(f + 0.05) + lys + sd_p * eps
-                if cond == "C2":
-                    y = y + offset
-                lab = f"S{k + 1}_{cond}_{L + 1}"
-                cols[lab] = y
-                rows.append({"label": lab, "condition": cond, "replicate": str(L + 1)})
-        imp = pd.DataFrame(cols, index=pd.Index(names, name="protein"))
-        if realistic:
-            lod = np.quantile(imp.to_numpy(), 0.03)               # ~3 % censored per temperature
-            low = imp < lod
-            imp = imp.mask(low, rng.normal(lod - 0.8, 0.3, imp.shape))
-        mats[t] = TemperatureMatrix(t, imp, None, pd.DataFrame(rows), Path("."))
-    truth = pd.DataFrame({"name": names, "dTm": dtm, "offset": offset})
-    return mats, truth
+def simulate(n_prot=2000, n_lysates=3, seed=0, realistic=True):
+    return simulate_intensity_series(n_prot=n_prot, n_lysates=n_lysates, seed=seed, realistic=realistic)
 
 
 def score(called: set, truth: pd.DataFrame, contrast: str) -> dict:
@@ -118,12 +70,13 @@ def run_once(limma, seed, n_lysates, realistic=True):
             rows.append({"method": label, "contrast": c, "seed": seed, "lysates": n_lysates,
                          **score(set(r.hits.loc[r.hits.contrast == c, "name"]), truth, c)})
     rho = adjacent_correlation(fits_p, TEMPS)
-    for baseline in ("median", "lowest", "none"):
+    for baseline, loc in (("none", 0.01), ("none", None), ("median", None), ("lowest", None)):
         for alpha in (0.05, 0.10):
-            prm = ShiftParams(baseline=baseline, window=2, alpha=alpha, fc_cutoff=0.6)
+            prm = ShiftParams(baseline=baseline, window=2, alpha=alpha, fc_cutoff=0.6, localisation_p=loc)
             tab, _ = shift_test(fits_p, TEMPS, CONTRASTS, prm, rho)
             for c in ("C1_vs_Ctl", "C2_vs_Ctl"):
-                rows.append({"method": f"shift test, baseline {baseline}, q≤{alpha}", "contrast": c,
+                name = f"shift test, baseline {baseline}" + (f" + localisation p≤{loc}" if loc else "")
+                rows.append({"method": f"{name}, q≤{alpha}", "contrast": c,
                              "seed": seed, "lysates": n_lysates,
                              **score(set(tab.loc[(tab.contrast == c) & tab.hit, "name"]), truth, c)})
     # calibration under the null: C2_vs_C1 has no thermal signal except C1 shifts... use a pure-null

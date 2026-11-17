@@ -41,7 +41,8 @@ DEFAULTS: dict[str, Any] = {
         "enabled": "auto",           # auto = when Deimos matrices/ sit next to every workbook
         "deimos_dir": None,          # Deimos folder providing limma_ebayes.py (or env DEIMOS_DIR)
         "paired": "auto",            # auto | true | false : lysate (replicate) as block
-        "baseline": "median",        # median | lowest | none
+        "baseline": "none",          # none | median | lowest (see shift.py)
+        "localisation_p": 0.01,      # detected window must differ from the profile median (null = off)
         "window": None,              # adjacent temperatures per window (null = call.min_consecutive)
         "alpha": 0.05,               # protein-level FDR (Simes over windows, then BH)
         "fc_cutoff": None,           # null = call.fc_cutoff

@@ -88,12 +88,14 @@ def run_shift_analysis(cfg: dict, loaded, temps, res: TPPResult, mode: str) -> S
 
     cp = res.call_params
     params = ShiftParams(
-        baseline=str(st.get("baseline", "median")),
+        baseline=str(st.get("baseline", "none")),
         window=int(st.get("window") or cp.min_consecutive),
         alpha=float(st.get("alpha", 0.05)),
         fc_cutoff=float(st.get("fc_cutoff") if st.get("fc_cutoff") is not None else cp.fc_cutoff),
         use_adjacent_correlation=bool(st.get("use_adjacent_correlation", True)),
         paired=st.get("paired", "auto"),
+        localisation_p=(None if st.get("localisation_p", 0.01) in (None, False, "null")
+                        else float(st.get("localisation_p", 0.01))),
     )
     params.validate()
     mats = load_series_matrices({t: runs[t] for t in temps.ids})
@@ -185,6 +187,10 @@ def methods_rows(sr: ShiftResult) -> list[tuple[str, str, str]]:
            f"({p.baseline}); variance includes the adjacent-temperature correlation; Welch–Satterthwaite df."),
         ("Shift test FDR", f"Simes over windows, BH over proteins, q ≤ {p.alpha}, |D| ≥ {p.fc_cutoff}",
          "Protein-level false discovery rate, per contrast, over the proteins retained by the presence filter"),
+        ("Localisation check", ("off" if p.localisation_p is None or p.baseline == "median"
+                                else f"best window vs profile median, p ≤ {p.localisation_p}"),
+         "Rejects constant offsets (significant at every temperature, never localised): handling "
+         "artefacts in lysate experiments, abundance changes in cells"),
         ("Adjacent correlation", "consensus residual correlation, same lysate", rho_txt),
         ("Permutations", f"{sr.n_patterns} within-lysate swap pattern(s) per contrast",
          "A/B labels swapped in a subset of lysates, the same at every temperature (identity and full "

@@ -17,13 +17,24 @@ possible) gives Δ_T and its moderated standard error SE_T. For each window of
 
     D_w = mean(Δ_T, T ∈ w) − baseline
 
-* ``baseline: median`` (default): median of the protein's Δ profile over all its
+* ``baseline: none`` (default): D_w = mean Δ over the window. Most powerful;
+  combined with the localisation check below it does not call constant offsets.
+* ``baseline: median``: median of the protein's Δ profile over all its
   temperatures. A thermal shift moves a few temperatures, so the median stays at
   the protein's baseline; a constant offset (handling artefact, or abundance
-  change in cells) is removed. Var ≈ (π/2)·mean(SE²)/K.
+  change in cells) is removed. Var ≈ (π/2)·mean(SE²)/K. Less powerful.
 * ``baseline: lowest``: Δ at the lowest temperature of the series (classical
-  ΔΔ / interaction contrast; noisier: one estimate).
-* ``baseline: none``: Δ itself (lysate experiments with no offset expected).
+  ΔΔ / interaction contrast; noisiest: one estimate).
+
+Localisation check (``localisation_p``, default 0.01, with ``none``/``lowest``):
+the detected window must also differ from the median of the profile (window
+p-value ≤ localisation_p). A constant offset is significant everywhere but never
+localised, so it is not called a shift.
+
+Validation (docs/validation/simulate_shift.py, realistic noise: protein-specific
+variances d0 = 2, t5 noise, censored + imputed low values; 3 lysates): false
+discovery proportion ≈ 3–4 %, sensitivity 0.67 for ΔTm = 2 °C and ≥ 0.89 for
+ΔTm ≥ 4 °C, 1–3 of 40 constant offsets called (the legacy rule calls ~35 of 40).
 
 Var(D_w) = [Σ SE_T² + 2 Σ ρ_{T,T+1} SE_T SE_{T+1}] / w² + Var(baseline), where
 ρ is the consensus correlation of residuals between adjacent temperatures for
@@ -67,12 +78,13 @@ BASELINES = ("median", "lowest", "none")
 
 @dataclass
 class ShiftParams:
-    baseline: str = "median"
+    baseline: str = "none"
     window: int = 2
     alpha: float = 0.05
     fc_cutoff: float = 0.6
     use_adjacent_correlation: bool = True
     paired: str = "auto"
+    localisation_p: float | None = 0.01   # with baseline none/lowest; None disables the check
 
     def validate(self) -> None:
         if self.baseline not in BASELINES:
@@ -81,6 +93,8 @@ class ShiftParams:
             raise ValueError("shift_test.window must be >= 1")
         if not 0 < self.alpha < 1:
             raise ValueError("shift_test.alpha must be in (0, 1)")
+        if self.localisation_p is not None and not 0 < self.localisation_p <= 1:
+            raise ValueError("shift_test.localisation_p must be in (0, 1] or null")
 
 
 def bh(p: np.ndarray) -> np.ndarray:
@@ -145,75 +159,92 @@ def _aligned(fits, temperatures, names, attr, j):
     return np.column_stack(cols)
 
 
+def _baseline(D, SE, dfs, kind):
+    n = D.shape[0]
+    kp = np.isfinite(D).sum(1)
+    with np.errstate(invalid="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)          # all-NaN rows -> NaN
+        if kind == "median":
+            return (np.nanmedian(D, axis=1),
+                    (np.pi / 2) * np.nanmean(SE ** 2, axis=1) / np.maximum(kp, 1),
+                    np.maximum(kp, 1) * float(np.mean(dfs)))
+        if kind == "lowest":
+            return D[:, 0], SE[:, 0] ** 2, np.full(n, dfs[0])
+    return np.zeros(n), np.zeros(n), np.full(n, np.inf)
+
+
+def _window_stats(D, SE, dfs, adj, starts, w, base, var_b, df_b):
+    """D, SE, df and p of every window (columns), Welch–Satterthwaite df."""
+    shape = (D.shape[0], len(starts))
+    P, DW, SW, DF = (np.full(shape, np.nan) for _ in range(4))
+    for k, i in enumerate(starts):
+        idx = list(range(i, i + w))
+        dw = D[:, idx].mean(1) - base                           # NaN if a temperature is missing
+        v = (SE[:, idx] ** 2).sum(1)
+        for a in range(i, i + w - 1):
+            v = v + 2 * adj[a] * SE[:, a] * SE[:, a + 1]
+        vw = v / w ** 2 + var_b
+        comps = [((SE[:, a] ** 2) / w ** 2, dfs[a]) for a in idx]
+        num = sum(x for x, _ in comps) + var_b
+        den = sum(x ** 2 / d for x, d in comps) + np.where(np.isfinite(df_b), var_b ** 2 / df_b, 0.0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            dfw = num ** 2 / den
+            pw = 2 * stats.t.sf(np.abs(dw / np.sqrt(vw)), dfw)
+        P[:, k], DW[:, k], SW[:, k], DF[:, k] = pw, dw, np.sqrt(vw), dfw
+    return P, DW, SW, DF
+
+
 def shift_test(fits: dict[str, TemperatureFit], temperatures: list[str], contrasts: list[str],
                params: ShiftParams, rho: dict | None = None,
                universe: list[str] | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Protein-level table (one row per contrast × protein) and window table."""
     params.validate()
-    names = universe or sorted(set().union(*[set(fits[t].proteins) for t in temperatures]))
-    names = list(names)
+    names = list(universe or sorted(set().union(*[set(fits[t].proteins) for t in temperatures])))
     K, w = len(temperatures), params.window
     dfs = np.array([fits[t].df_total for t in temperatures])
     rho = rho or {}
     adj = np.array([rho.get((a, b), 0.0) for a, b in zip(temperatures[:-1], temperatures[1:])]) \
         if params.use_adjacent_correlation else np.zeros(max(K - 1, 0))
+    starts = [i for i in range(K - w + 1) if not (params.baseline == "lowest" and i == 0)]
+    labels = [f"{temperatures[i]}-{temperatures[i + w - 1]}" if w > 1 else temperatures[i] for i in starts]
+    check_loc = params.localisation_p is not None and params.baseline != "median"
     prot_rows, win_rows = [], []
+    rows = np.arange(len(names))
     for j, c in enumerate(contrasts):
         D = _aligned(fits, temperatures, names, "diff", j)
         SE = _aligned(fits, temperatures, names, "se", j)
-        present = np.isfinite(D)
-        kp = present.sum(1)
-        with np.errstate(invalid="ignore"), warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)     # all-NaN rows -> NaN
-            if params.baseline == "median":
-                base = np.nanmedian(D, axis=1)
-                var_b = (np.pi / 2) * np.nanmean(SE ** 2, axis=1) / np.maximum(kp, 1)
-                df_b = np.maximum(kp, 1) * float(np.mean(dfs))
-            elif params.baseline == "lowest":
-                base, var_b = D[:, 0], SE[:, 0] ** 2
-                df_b = np.full(len(names), dfs[0])
-            else:
-                base, var_b = np.zeros(len(names)), np.zeros(len(names))
-                df_b = np.full(len(names), np.inf)
-        starts = [i for i in range(K - w + 1) if not (params.baseline == "lowest" and i == 0)]
-        P = np.full((len(names), len(starts)), np.nan)
-        DW = np.full_like(P, np.nan)
-        SW = np.full_like(P, np.nan)
-        for k, i in enumerate(starts):
-            idx = list(range(i, i + w))
-            dw = D[:, idx].mean(1) - base                       # NaN if any temperature is missing
-            v = (SE[:, idx] ** 2).sum(1)
-            for a in range(i, i + w - 1):
-                v = v + 2 * adj[a] * SE[:, a] * SE[:, a + 1]
-            vw = v / w ** 2 + var_b
-            comps = [((SE[:, a] ** 2) / w ** 2, dfs[a]) for a in idx]
-            num = sum(x for x, _ in comps) + var_b
-            den = sum(x ** 2 / d for x, d in comps) + np.where(np.isfinite(df_b), var_b ** 2 / df_b, 0.0)
-            with np.errstate(invalid="ignore", divide="ignore"):
-                dfw = num ** 2 / den
-                tw = dw / np.sqrt(vw)
-                pw = 2 * stats.t.sf(np.abs(tw), dfw)
-            P[:, k], DW[:, k], SW[:, k] = pw, dw, np.sqrt(vw)
-            lab = f"{temperatures[i]}-{temperatures[i + w - 1]}" if w > 1 else temperatures[i]
-            ok = np.isfinite(pw)
+        kp = np.isfinite(D).sum(1)
+        base, var_b, df_b = _baseline(D, SE, dfs, params.baseline)
+        P, DW, SW, DF = _window_stats(D, SE, dfs, adj, starts, w, base, var_b, df_b)
+        for k, lab in enumerate(labels):
+            ok = np.isfinite(P[:, k])
             win_rows.append(pd.DataFrame({"contrast": c, "name": np.array(names)[ok], "window": lab,
-                                          "dd": dw[ok], "se": np.sqrt(vw)[ok], "df": dfw[ok], "p": pw[ok]}))
+                                          "dd": DW[ok, k], "se": SW[ok, k], "df": DF[ok, k], "p": P[ok, k]}))
         p_prot = simes(P)
         q = bh(p_prot)
         anyp = np.isfinite(P).any(1)
-        best = np.where(anyp, np.nanargmin(np.where(np.isfinite(P), P, np.inf), axis=1), 0)
-        rows = np.arange(len(names))
-        dd_best = np.where(anyp, DW[rows, best], np.nan)
-        lab_best = [(f"{temperatures[starts[b]]}-{temperatures[starts[b] + w - 1]}" if w > 1
-                     else temperatures[starts[b]]) if anyp[i] else None for i, b in enumerate(best)]
+        best = np.where(anyp, np.argmin(np.where(np.isfinite(P), P, np.inf), axis=1), 0)
         tab = pd.DataFrame({
             "contrast": c, "name": names, "n_temperatures": kp, "baseline": base,
-            "best_window": lab_best, "dd_best": dd_best, "se_best": np.where(anyp, SW[rows, best], np.nan),
+            "best_window": [labels[b] if anyp[i] else None for i, b in enumerate(best)],
+            "dd_best": np.where(anyp, DW[rows, best], np.nan),
+            "se_best": np.where(anyp, SW[rows, best], np.nan),
             "p_best_window": np.where(anyp, P[rows, best], np.nan), "n_windows": np.isfinite(P).sum(1),
             "p_protein": p_prot, "q_protein": q,
         })
         tab["direction"] = np.where(tab["dd_best"] > 0, "up", np.where(tab["dd_best"] < 0, "down", None))
-        tab["hit"] = (tab["q_protein"] <= params.alpha) & (tab["dd_best"].abs() >= params.fc_cutoff)
+        hit = (tab["q_protein"] <= params.alpha) & (tab["dd_best"].abs() >= params.fc_cutoff)
+        if check_loc:
+            # localisation: the detected window must also stand out from the profile median,
+            # which rejects constant offsets (handling artefacts, abundance changes)
+            mb, mv, mdf = _baseline(D, SE, dfs, "median")
+            Pm, DWm, _, _ = _window_stats(D, SE, dfs, adj, starts, w, mb, mv, mdf)
+            tab["median_baseline"] = mb
+            tab["dd_vs_median"] = np.where(anyp, DWm[rows, best], np.nan)
+            tab["p_localisation"] = np.where(anyp, Pm[rows, best], np.nan)
+            tab["localised"] = tab["p_localisation"] <= params.localisation_p
+            hit = hit & tab["localised"]
+        tab["hit"] = hit.astype(bool)
         prot_rows.append(tab)
     prot = pd.concat(prot_rows, ignore_index=True)
     wins = pd.concat(win_rows, ignore_index=True) if win_rows else pd.DataFrame()

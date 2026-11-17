@@ -106,8 +106,9 @@ def main(argv: list[str] | None = None) -> int:
         log.error("%s", e)
         return 1
     res = out["result"]
+    from .shift_pipeline import summary_columns
     print("\nSummary")
-    print(res.summary.to_string(index=False))
+    print(summary_columns(out.get("shift"), res).to_string(index=False))
     print(f"\nResults in {Path(cfg['output']['out_dir']).resolve()}")
     return 0
 

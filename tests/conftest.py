@@ -26,3 +26,19 @@ def real_deimos_results() -> Path:
     if not p or not Path(p).is_dir():
         pytest.skip("set OLYMPUS_DEIMOS_RESULTS to a folder holding the real Deimos result workbooks")
     return Path(p)
+
+
+@pytest.fixture(scope="session")
+def limma_engine():
+    """Deimos' limma_ebayes (DEIMOS_DIR); the shift-test suites are skipped without it."""
+    from olympus.engine import load_limma
+    try:
+        return load_limma(os.environ.get("DEIMOS_DIR"))
+    except ImportError:
+        pytest.skip("set DEIMOS_DIR to a Deimos clone (limma_ebayes.py) to run the shift-test suites")
+
+
+@pytest.fixture(scope="session")
+def sim_series():
+    from olympus.synthetic import simulate_intensity_series
+    return simulate_intensity_series(n_prot=600, n_lysates=3, seed=1)

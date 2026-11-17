@@ -38,8 +38,11 @@ pip install -e .            # or: pip install -r requirements.txt && pip install
 pip install adjustText      # optional: non-overlapping labels on volcano plots
 ```
 
-Python ≥ 3.10. Deimos is not a dependency: only its result workbooks are read
-(tested with Deimos commits `4d49d24`, 27/09/2026, and `e160463`, 17/11/2026).
+Python ≥ 3.10. Olympus reads the Deimos result workbooks (tested with Deimos commits
+`4d49d24`, 27/09/2026, and `e160463`, 17/11/2026). The **shift test** also needs a
+Deimos folder for its limma engine (`limma_ebayes.py`): set `shift_test.deimos_dir` in
+the YAML or the `DEIMOS_DIR` environment variable. Without it, the shift test is
+skipped and the rest of the analysis runs as before.
 
 ---
 
@@ -120,10 +123,40 @@ deimos_results/T1_ProteomicAnalysis_Results.xlsx                  # renamed copi
    - `run_start`–`run_end`, `direction`, `n_sig_temps`, `max_abs_diff`, `max_logp`.
    - `over_strict` / `over_r_legacy`: the result of each rule, for comparison.
 
-> **Multiple testing.** p-values are thresholded temperature by temperature. The
-> consecutive-temperature rule limits false positives but does not calibrate them
-> (adjacent temperatures come from the same lysates and are correlated). Treat hits
-> as candidates, check them on the raw profiles, and read the flags.
+> **Multiple testing.** The legacy rule thresholds p-values temperature by temperature.
+> It limits false positives but does not calibrate them (adjacent temperatures come
+> from the same lysates and are correlated). Use the shift test below for a controlled
+> false discovery rate, and the permutation estimates to judge the legacy calls.
+
+### Shift test (protein-level FDR)
+
+It runs when every Deimos output has its `matrices/` folder (`log2_imputed.tsv` +
+`samples.tsv`, written by default since Deimos `e160463`).
+
+1. **Paired refit per temperature.** Deimos' limma is refitted on the imputed
+   matrix. When one lysate (replicate) is split into every condition, the lysate
+   becomes a block: `~0 + condition + replicate`. On the S. aureus TPP data this
+   multiplies the number of proteins at p < 0.01 by 2 to 5 at most temperatures.
+2. **Windows of adjacent temperatures** (`window` = `call.min_consecutive`, 2 by
+   default). D = mean log2FC over the window. Its variance includes the residual
+   correlation between adjacent temperatures for the same lysate; Welch–Satterthwaite
+   degrees of freedom are used.
+3. **Protein level.**
+   - Simes combination of the window p-values, then Benjamini–Hochberg across the
+     proteins retained by the presence filter, per contrast: `q_protein`.
+   - Hit = `q_protein ≤ alpha` (0.05) and |D| ≥ `fc_cutoff`.
+4. **Localisation check** (`localisation_p: 0.01`). The detected window must also
+   differ from the median of the protein's profile. A constant offset (handling
+   artefact in lysate, abundance change in cells) is significant everywhere but never
+   localised, so it is not called a shift.
+5. **Permutations.** The two conditions of a contrast are swapped in a subset of the
+   lysates, the same subset at every temperature. The null hits give an FDR estimate
+   for the shift test and for the legacy rule (sheet `FDR_estimates`). With 3 lysates
+   there are only 3 distinct patterns, so the estimate is indicative.
+
+Other baselines: `baseline: median` (D relative to the profile median: most robust,
+less powerful) and `baseline: lowest` (classical ΔΔ against the lowest temperature:
+noisiest).
 
 ---
 
@@ -137,6 +170,10 @@ deimos_results/T1_ProteomicAnalysis_Results.xlsx                  # renamed copi
 | `TPP_plots.pdf` | FC and -log10 p profiles: all proteins in grey with hits highlighted, then one panel per hit. |
 | `<contrast>_plot3D.html` | Interactive 3D view (temperature × log2FC × -log10 p) with threshold planes. `plotly_js: embed` (default) works offline. |
 | `<contrast>_rotation.gif` | Optional (`plots.gif: true`), rendered with matplotlib. |
+| `shift_test.csv`, sheet `Shift_test` | Shift test, one row per contrast × protein: best window, D, `p_protein`, `q_protein`, localisation, `hit`. |
+| `shift_windows.csv` | Every window statistic (D, SE, df, p). |
+| sheet `FDR_estimates` | Permutation estimates for the shift test and the legacy rule. |
+| `shift_test_plots.pdf` | Per contrast: p-value histogram (calibration check), then the top candidates (log2FC ± 95 % CI per temperature, best window shaded). |
 | `last_config.yaml` | Full configuration of the run. |
 
 Consistency checks on the inputs:
@@ -174,6 +211,25 @@ On the 12-temperature *S. aureus* dataset of the R project:
 | Deimos vs DEP log2FC, rows without imputation | identical (max difference 2 × 10⁻¹⁴, 22,423 rows) |
 | Deimos vs DEP log2FC, rows with imputation (QRILC vs MinProb) | median \|Δ\| = 0.29 (1,369 rows) |
 | Hits | Both R hits found again (C1_vs_Ctl, T9–T10, up). One extra hit in C2_vs_Ctl, flagged `imputed_in_run` + `undetermined` (absent at T1). |
+| Shift test | No protein at q ≤ 0.05. Q2FVX1 and Q2FYE7 are the top-ranked candidates of C1_vs_Ctl (T9–T10), not significant after FDR control. The permutations give about as many legacy-rule hits as the real labels. |
+
+**Simulation** (`docs/validation/simulate_shift.py`, 4 simulated datasets of 2,000 proteins).
+
+Model: lysate-treated TPP. C1 stabilises 4 % of the proteins (ΔTm 2, 4 or 6 °C); C2
+carries a constant +0.8 offset on 2 % (artefact). The noise is calibrated on the real
+data: protein-specific variances with d0 = 2, t5 noise, 3 % censored values imputed.
+
+| 3 lysates | False discovery proportion | Sensitivity ΔTm 2 °C | ΔTm 4 °C | Offsets called (of 40) |
+|---|---|---|---|---|
+| Legacy rule (Deimos fit) | 0 % | 0.48 | 0.91 | 33 |
+| Shift test, default | 3.2 % | **0.67** | 0.89 | **1** |
+| Shift test, `baseline: median` | 6.7 % | 0.37 | 0.87 | 0 |
+
+With 4 lysates the default reaches 1.1 % FDP and a sensitivity of 0.72 at ΔTm = 2 °C.
+
+The legacy rule makes about one false call per contrast whatever the data. When
+real shifts are rare, its few hits are therefore mostly false, and it calls almost
+every constant offset a shift.
 
 ---
 
@@ -192,11 +248,13 @@ are not set.
 
 ## Limitations and ideas
 
-- No FDR across temperatures. Options: permutation of the condition labels within
-  replicates, or a curve model (NPARC-type, Childs et al. 2019).
-- Per-temperature statistics cannot separate abundance from stability. A limma model
-  with a temperature × condition interaction, fitted on all temperatures together,
-  would. For now the `abundance-like` flag is a heuristic.
+- To be validated on a TPP dataset with a known ligand–target pair.
+- With 3 lysates, the permutation estimates rest on 3 patterns only, and the shift
+  test is slightly anti-conservative under heavy-tailed noise (3 % FDP for a 5 %
+  nominal level in simulation). 4 lysates or more are recommended.
+- Melting curves and Tm (NPARC-type, Childs et al. 2019) need intensities that are
+  comparable across temperatures. For new acquisitions, run DIA-NN on all
+  temperatures together, without cross-run normalisation.
 - Deimos side: reading `columns[:6]` as annotations and the `Sple-…_` regex are
   hard-coded (see the audit).
 
