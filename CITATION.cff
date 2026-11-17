@@ -3,7 +3,7 @@ message: "If you use this software, please cite it as below."
 title: "Olympus: fold-change based Thermal Proteome Profiling (Python port of FC.TPP)"
 version: 0.1.0
 date-released: 2026-09-27
-license: Artistic-2.0
+license: MIT
 repository-code: "https://github.com/BenoitBe/olympus-tpp-pipeline"
 authors:
   - family-names: Bernay

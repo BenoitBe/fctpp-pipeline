@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Olympus — fold-change Thermal Proteome Profiling on per-temperature Deimos results (Python port of FC.TPP)"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Artistic-2.0" }
+license = { text = "MIT" }
 authors = [
   { name = "Benoit Bernay", email = "benoit.bernay@unicaen.fr" },
   { name = "Anthony Sleiman", email = "anthony.sleiman@univ-rouen.fr" },
@@ -17,6 +17,7 @@ authors = [
 keywords = ["proteomics", "thermal proteome profiling", "TPP", "DIA-NN", "mass spectrometry"]
 classifiers = [
   "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
   "Topic :: Scientific/Engineering :: Bio-Informatics",
   "Operating System :: OS Independent",
 ]
