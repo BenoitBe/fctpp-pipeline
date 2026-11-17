@@ -37,6 +37,25 @@ DEFAULTS: dict[str, Any] = {
         "rule": "strict",            # strict | r_legacy
         "abundance_check": True,
     },
+    "shift_test": {
+        "enabled": "auto",           # auto = when Deimos matrices/ sit next to every workbook
+        "deimos_dir": None,          # Deimos folder providing limma_ebayes.py (or env DEIMOS_DIR)
+        "paired": "auto",            # auto (measured within-lysate correlation) | true | false
+        "baseline": "none",          # none | median | lowest (see shift.py)
+        "localisation_p": 0.01,      # detected window must differ from the profile median (null = off)
+        "windows": [2, 3, 4],        # window sizes (adjacent temperatures), combined by Simes
+        "window": None,              # single size instead (overrides windows); both null = call.min_consecutive
+        "alpha": 0.05,               # protein-level FDR (Simes over windows, then BH)
+        "fc_cutoff": None,           # null = call.fc_cutoff
+        "use_adjacent_correlation": True,
+        "shared_component": True,    # diagnostic of effects common to many proteins (flags hits)
+        "shared_r_threshold": 0.7,   # |r| with the shared pattern above which a protein is flagged
+        "shared_n_null": 100,        # sign-flip draws for the significance of the component
+        "shared_min_ratio": 1.5,     # flags only if the component explains >= 1.5x its null 95 % quantile
+        "permutations": True,        # within-lysate swaps -> FDR estimate of each rule
+        "max_patterns": 64,
+        "seed": 42,
+    },
     "plots": {
         "volcano": True,
         "volcano_layout": "grid",    # grid (1 page / contrast) | pages (1 page / temperature x contrast)

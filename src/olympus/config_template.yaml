@@ -46,7 +46,34 @@ call:
                                      # r_legacy = exact R behaviour (successive rows, any sign)
   abundance_check: true              # flag hits already present at the lowest temperature
 
-# ── 4. Figures ───────────────────────────────────────────────────────────────
+# ── 4. Shift test (protein-level FDR) ────────────────────────────────────────
+# Refits every temperature from the Deimos matrices/ folder (log2_imputed.tsv +
+# samples.tsv) with Deimos' limma engine, then tests windows of adjacent
+# temperatures and controls the false discovery rate at the protein level.
+# Within-lysate permutations estimate the false discoveries of each rule.
+shift_test:
+  enabled: auto                      # auto = when matrices/ sit next to every workbook
+  deimos_dir: null                   # Deimos folder (limma_ebayes.py); or env DEIMOS_DIR
+  paired: auto                       # auto = lysate as block when complete AND the within-lysate
+                                     #   correlation is positive (one-sided test, p < 0.05) | true | false
+  baseline: none                     # none | median | lowest
+  localisation_p: 0.01               # detected window must differ from the profile median
+  windows: [2, 3, 4]                 # window sizes (adjacent temperatures) combined by Simes:
+                                     #   2 for narrow shifts, 3-4 for broad ones
+  window: null                       # single size instead (overrides windows)
+  alpha: 0.05                        # protein-level FDR
+  fc_cutoff: null                    # null = call.fc_cutoff
+  use_adjacent_correlation: true
+  shared_component: true             # SVD of the protein x temperature delta matrix: effect common to
+                                     #   many proteins (handling per temperature, solvent, complexes)
+  shared_r_threshold: 0.7            # hits with |r| >= 0.7 with that pattern are flagged shared_profile
+  shared_n_null: 100                 # sign-flip draws (significance of the component)
+  shared_min_ratio: 1.5              # flags only when the component explains >= 1.5x its null 95 % quantile
+  permutations: true
+  max_patterns: 64
+  seed: 42
+
+# ── 5. Figures ───────────────────────────────────────────────────────────────
 plots:
   volcano: true
   volcano_layout: grid               # grid = 1 page per contrast | pages = R layout
@@ -61,7 +88,7 @@ plots:
   gif: false
   label_column: Genes                # labels on figures (accession if empty)
 
-# ── 5. Outputs ───────────────────────────────────────────────────────────────
+# ── 6. Outputs ───────────────────────────────────────────────────────────────
 output:
   out_dir: olympus_output
   excel: Olympus_Results.xlsx
