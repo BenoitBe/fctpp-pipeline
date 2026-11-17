@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="200" height="240" role="img" aria-label="Olympus">
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="42%" r="80%">
+      <stop offset="0%" stop-color="#0e1524"/>
+      <stop offset="100%" stop-color="#05070f"/>
+    </radialGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b0603a"/>
+      <stop offset="55%" stop-color="#8a4529"/>
+      <stop offset="100%" stop-color="#4e2717"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="1" y2="0.35">
+      <stop offset="0%" stop-color="#6e3820"/>
+      <stop offset="45%" stop-color="#b8693f"/>
+      <stop offset="62%" stop-color="#9a522f"/>
+      <stop offset="100%" stop-color="#4a2414"/>
+    </linearGradient>
+    <radialGradient id="heat" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff9a4a" stop-opacity="0.55"/>
+      <stop offset="45%" stop-color="#e0552f" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#e0552f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="haze" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b4786e" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#b4786e" stop-opacity="0.40"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f6dca0"/>
+      <stop offset="100%" stop-color="#e8a24a"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur stdDeviation="1.1" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="card"><rect x="2" y="2" width="196" height="236" rx="16"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#card)">
+    <rect x="0" y="0" width="200" height="240" fill="url(#sky)"/>
+
+    <!-- stars -->
+    <g fill="#9fb6d4"><circle cx="49.7" cy="62.8" r="0.48" opacity="0.68"/><circle cx="124.1" cy="11.1" r="0.31" opacity="0.81"/><circle cx="53.8" cy="29.3" r="0.80" opacity="0.61"/><circle cx="164.6" cy="55.4" r="0.62" opacity="0.43"/><circle cx="125.9" cy="97.7" r="0.56" opacity="0.76"/><circle cx="132.9" cy="10.9" r="0.68" opacity="0.68"/><circle cx="61.8" cy="7.3" r="0.73" opacity="0.61"/><circle cx="142.0" cy="98.9" r="0.66" opacity="0.86"/><circle cx="79.8" cy="90.5" r="0.52" opacity="0.86"/><circle cx="172.7" cy="14.5" r="0.37" opacity="0.47"/><circle cx="189.4" cy="51.1" r="0.61" opacity="0.52"/><circle cx="101.4" cy="45.7" r="0.48" opacity="0.67"/><circle cx="116.2" cy="101.7" r="0.64" opacity="0.86"/><circle cx="168.4" cy="111.0" r="0.64" opacity="0.44"/><circle cx="169.2" cy="108.2" r="0.75" opacity="0.66"/><circle cx="141.1" cy="26.8" r="0.72" opacity="0.67"/><circle cx="58.7" cy="10.9" r="0.73" opacity="0.89"/><circle cx="21.0" cy="90.5" r="0.51" opacity="0.43"/><circle cx="60.4" cy="87.0" r="0.74" opacity="0.37"/><circle cx="122.0" cy="8.9" r="0.66" opacity="0.53"/><circle cx="173.1" cy="109.9" r="0.55" opacity="0.90"/><circle cx="63.5" cy="12.3" r="0.60" opacity="0.37"/><circle cx="41.9" cy="48.1" r="0.61" opacity="0.44"/><circle cx="12.1" cy="97.7" r="0.46" opacity="0.88"/><circle cx="176.2" cy="44.8" r="0.53" opacity="0.64"/><circle cx="127.6" cy="68.3" r="0.58" opacity="0.69"/></g>
+
+    <!-- spectrum sticks (family signature), tinted cold -> hot -->
+    <g>
+      <line x1="39.9" y1="86.0" x2="39.9" y2="75.9" stroke="#4f8fd6" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="42.7" y1="86.0" x2="42.7" y2="77.6" stroke="#5691d1" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="45.1" y1="86.0" x2="45.1" y2="77.5" stroke="#5c93cd" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="48.9" y1="86.0" x2="48.9" y2="84.6" stroke="#6696c6" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="50.5" y1="86.0" x2="50.5" y2="64.7" stroke="#6a98c3" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="53.2" y1="86.0" x2="53.2" y2="54.0" stroke="#719abe" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="57.0" y1="86.0" x2="57.0" y2="73.8" stroke="#7a9db7" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="58.7" y1="86.0" x2="58.7" y2="60.5" stroke="#7f9eb4" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="61.9" y1="86.0" x2="61.9" y2="84.8" stroke="#87a1af" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="65.0" y1="86.0" x2="65.0" y2="62.9" stroke="#8fa3a9" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="68.1" y1="86.0" x2="68.1" y2="77.8" stroke="#97a6a3" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="70.6" y1="86.0" x2="70.6" y2="82.9" stroke="#9da89f" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="74.3" y1="86.0" x2="74.3" y2="63.0" stroke="#a7ab98" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="76.0" y1="86.0" x2="76.0" y2="83.5" stroke="#abac95" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="78.4" y1="86.0" x2="78.4" y2="67.0" stroke="#b1ae91" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="82.4" y1="86.0" x2="82.4" y2="80.8" stroke="#bbb28a" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="85.2" y1="86.0" x2="85.2" y2="84.8" stroke="#c2b485" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="88.1" y1="86.0" x2="88.1" y2="78.7" stroke="#cab67f" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="90.1" y1="86.0" x2="90.1" y2="84.7" stroke="#cfb87c" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="93.5" y1="86.0" x2="93.5" y2="59.3" stroke="#d7bb76" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="96.6" y1="86.0" x2="96.6" y2="60.0" stroke="#dfbd70" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="97.9" y1="86.0" x2="97.9" y2="84.7" stroke="#e3be6e" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="100.9" y1="86.0" x2="100.9" y2="75.9" stroke="#e8be69" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="103.7" y1="86.0" x2="103.7" y2="68.7" stroke="#e8b966" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="107.2" y1="86.0" x2="107.2" y2="84.5" stroke="#e7b363" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="109.3" y1="86.0" x2="109.3" y2="83.0" stroke="#e7af61" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="113.1" y1="86.0" x2="113.1" y2="82.5" stroke="#e6a95d" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="114.9" y1="86.0" x2="114.9" y2="80.7" stroke="#e6a55b" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="118.4" y1="86.0" x2="118.4" y2="84.6" stroke="#e69f58" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="120.5" y1="86.0" x2="120.5" y2="83.2" stroke="#e59c56" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="123.4" y1="86.0" x2="123.4" y2="61.3" stroke="#e59653" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="126.7" y1="86.0" x2="126.7" y2="83.4" stroke="#e49050" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="129.1" y1="86.0" x2="129.1" y2="79.2" stroke="#e48c4d" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="132.1" y1="86.0" x2="132.1" y2="75.3" stroke="#e4874a" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="134.4" y1="86.0" x2="134.4" y2="84.3" stroke="#e38348" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="138.2" y1="86.0" x2="138.2" y2="83.3" stroke="#e37c44" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="140.9" y1="86.0" x2="140.9" y2="56.8" stroke="#e37742" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="144.0" y1="86.0" x2="144.0" y2="60.5" stroke="#e2723f" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="145.9" y1="86.0" x2="145.9" y2="54.3" stroke="#e26e3d" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="148.4" y1="86.0" x2="148.4" y2="70.0" stroke="#e26a3a" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="152.2" y1="86.0" x2="152.2" y2="74.5" stroke="#e16337" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="153.9" y1="86.0" x2="153.9" y2="60.2" stroke="#e16035" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="157.3" y1="86.0" x2="157.3" y2="62.3" stroke="#e05a32" stroke-width="0.8" stroke-opacity="0.85"/>
+      <line x1="159.6" y1="86.0" x2="159.6" y2="58.3" stroke="#e0562f" stroke-width="0.8" stroke-opacity="0.85"/>
+    </g>
+
+    <!-- volcanic heat over the caldera -->
+    <ellipse cx="88.0" cy="122.0" rx="42" ry="16" fill="url(#heat)"/>
+
+    <!-- plain -->
+    <rect x="-5" y="178.0" width="210" height="70" fill="url(#ground)"/>
+    <rect x="0" y="164" width="200" height="15" fill="url(#haze)"/>
+
+    <!-- Olympus Mons: its flanks are melting curves -->
+    <path d="M -34.0 178.6 L -34.0 177.99 L -33.0 177.99 L -32.0 177.99 L -31.0 177.99 L -30.0 177.99 L -29.0 177.99 L -28.0 177.98 L -27.0 177.98 L -26.0 177.98 L -25.0 177.98 L -24.0 177.98 L -23.0 177.97 L -22.0 177.97 L -21.0 177.96 L -20.0 177.96 L -19.0 177.95 L -18.0 177.95 L -17.0 177.94 L -16.0 177.93 L -15.0 177.92 L -14.0 177.91 L -13.0 177.90 L -12.0 177.89 L -11.0 177.87 L -10.0 177.86 L -9.0 177.84 L -8.0 177.82 L -7.0 177.79 L -6.0 177.76 L -5.0 177.73 L -4.0 177.70 L -3.0 177.66 L -2.0 177.61 L -1.0 177.56 L 0.0 177.50 L 1.0 177.44 L 2.0 177.36 L 3.0 177.28 L 4.0 177.18 L 5.0 177.08 L 6.0 176.96 L 7.0 176.82 L 8.0 176.67 L 9.0 176.49 L 10.0 176.30 L 11.0 176.08 L 12.0 175.84 L 13.0 175.56 L 14.0 175.25 L 15.0 174.90 L 16.0 174.51 L 17.0 174.08 L 18.0 173.60 L 19.0 173.06 L 20.0 172.47 L 21.0 171.81 L 22.0 171.09 L 23.0 170.29 L 24.0 169.41 L 25.0 168.46 L 26.0 167.42 L 27.0 166.29 L 28.0 165.08 L 29.0 163.79 L 30.0 162.40 L 31.0 160.94 L 32.0 159.39 L 33.0 157.78 L 34.0 156.10 L 35.0 154.37 L 36.0 152.61 L 37.0 150.81 L 38.0 149.00 L 39.0 147.19 L 40.0 145.39 L 41.0 143.63 L 42.0 141.90 L 43.0 140.22 L 44.0 138.61 L 45.0 137.06 L 46.0 135.60 L 47.0 134.21 L 48.0 132.92 L 49.0 131.71 L 50.0 130.58 L 51.0 129.54 L 52.0 128.59 L 53.0 127.71 L 54.0 126.91 L 55.0 126.19 L 56.0 125.53 L 57.0 124.94 L 58.0 124.40 L 59.0 123.92 L 60.0 123.49 L 61.0 123.10 L 62.0 122.75 L 63.0 122.44 L 64.0 122.16 L 65.0 121.92 L 66.0 121.70 L 67.0 121.51 L 68.0 121.33 L 69.0 121.18 L 70.0 121.04 L 71.0 120.92 L 72.0 120.82 L 73.0 120.72 L 74.0 120.64 L 75.0 120.56 L 76.0 120.50 L 77.0 120.44 L 78.0 120.39 L 79.0 120.34 L 80.0 120.30 L 81.0 120.27 L 82.0 120.24 L 83.0 120.21 L 84.0 120.18 L 85.0 120.16 L 86.0 120.14 L 87.0 120.13 L 88.0 120.11 L 89.0 120.13 L 90.0 120.14 L 91.0 120.16 L 92.0 120.18 L 93.0 120.21 L 94.0 120.24 L 95.0 120.27 L 96.0 120.30 L 97.0 120.34 L 98.0 120.39 L 99.0 120.44 L 100.0 120.50 L 101.0 120.56 L 102.0 120.64 L 103.0 120.72 L 104.0 120.82 L 105.0 120.92 L 106.0 121.04 L 107.0 121.18 L 108.0 121.33 L 109.0 121.51 L 110.0 121.70 L 111.0 121.92 L 112.0 122.16 L 113.0 122.44 L 114.0 122.75 L 115.0 123.10 L 116.0 123.49 L 117.0 123.92 L 118.0 124.40 L 119.0 124.94 L 120.0 125.53 L 121.0 126.19 L 122.0 126.91 L 123.0 127.71 L 124.0 128.59 L 125.0 129.54 L 126.0 130.58 L 127.0 131.71 L 128.0 132.92 L 129.0 134.21 L 130.0 135.60 L 131.0 137.06 L 132.0 138.61 L 133.0 140.22 L 134.0 141.90 L 135.0 143.63 L 136.0 145.39 L 137.0 147.19 L 138.0 149.00 L 139.0 150.81 L 140.0 152.61 L 141.0 154.37 L 142.0 156.10 L 143.0 157.78 L 144.0 159.39 L 145.0 160.94 L 146.0 162.40 L 147.0 163.79 L 148.0 165.08 L 149.0 166.29 L 150.0 167.42 L 151.0 168.46 L 152.0 169.41 L 153.0 170.29 L 154.0 171.09 L 155.0 171.81 L 156.0 172.47 L 157.0 173.06 L 158.0 173.60 L 159.0 174.08 L 160.0 174.51 L 161.0 174.90 L 162.0 175.25 L 163.0 175.56 L 164.0 175.84 L 165.0 176.08 L 166.0 176.30 L 167.0 176.49 L 168.0 176.67 L 169.0 176.82 L 170.0 176.96 L 171.0 177.08 L 172.0 177.18 L 173.0 177.28 L 174.0 177.36 L 175.0 177.44 L 176.0 177.50 L 177.0 177.56 L 178.0 177.61 L 179.0 177.66 L 180.0 177.70 L 181.0 177.73 L 182.0 177.76 L 183.0 177.79 L 184.0 177.82 L 185.0 177.84 L 186.0 177.86 L 187.0 177.87 L 188.0 177.89 L 189.0 177.90 L 190.0 177.91 L 191.0 177.92 L 192.0 177.93 L 193.0 177.94 L 194.0 177.95 L 195.0 177.95 L 196.0 177.96 L 197.0 177.96 L 198.0 177.97 L 199.0 177.97 L 200.0 177.98 L 201.0 177.98 L 202.0 177.98 L 203.0 177.98 L 204.0 177.98 L 205.0 177.99 L 206.0 177.99 L 207.0 177.99 L 208.0 177.99 L 209.0 177.99 L 210.0 177.99 L 210.0 178.6 Z" fill="url(#shield)"/>
+    <ellipse cx="86.0" cy="120.7" rx="11" ry="1.9" fill="#2a140b" opacity="0.85"/>
+    <ellipse cx="92.0" cy="121.0" rx="5" ry="1.0" fill="#160a05" opacity="0.9"/>
+
+    <!-- control melting curve (the flank) and stabilised curve (ΔTm) -->
+    <path d="M 88.0 120.11 L 89.0 120.13 L 90.0 120.14 L 91.0 120.16 L 92.0 120.18 L 93.0 120.21 L 94.0 120.24 L 95.0 120.27 L 96.0 120.30 L 97.0 120.34 L 98.0 120.39 L 99.0 120.44 L 100.0 120.50 L 101.0 120.56 L 102.0 120.64 L 103.0 120.72 L 104.0 120.82 L 105.0 120.92 L 106.0 121.04 L 107.0 121.18 L 108.0 121.33 L 109.0 121.51 L 110.0 121.70 L 111.0 121.92 L 112.0 122.16 L 113.0 122.44 L 114.0 122.75 L 115.0 123.10 L 116.0 123.49 L 117.0 123.92 L 118.0 124.40 L 119.0 124.94 L 120.0 125.53 L 121.0 126.19 L 122.0 126.91 L 123.0 127.71 L 124.0 128.59 L 125.0 129.54 L 126.0 130.58 L 127.0 131.71 L 128.0 132.92 L 129.0 134.21 L 130.0 135.60 L 131.0 137.06 L 132.0 138.61 L 133.0 140.22 L 134.0 141.90 L 135.0 143.63 L 136.0 145.39 L 137.0 147.19 L 138.0 149.00 L 139.0 150.81 L 140.0 152.61 L 141.0 154.37 L 142.0 156.10 L 143.0 157.78 L 144.0 159.39 L 145.0 160.94 L 146.0 162.40 L 147.0 163.79 L 148.0 165.08 L 149.0 166.29 L 150.0 167.42 L 151.0 168.46 L 152.0 169.41 L 153.0 170.29 L 154.0 171.09 L 155.0 171.81 L 156.0 172.47 L 157.0 173.06 L 158.0 173.60 L 159.0 174.08 L 160.0 174.51 L 161.0 174.90 L 162.0 175.25 L 163.0 175.56 L 164.0 175.84 L 165.0 176.08 L 166.0 176.30 L 167.0 176.49 L 168.0 176.67 L 169.0 176.82 L 170.0 176.96 L 171.0 177.08 L 172.0 177.18 L 173.0 177.28 L 174.0 177.36 L 175.0 177.44 L 176.0 177.50 L 177.0 177.56 L 178.0 177.61 L 179.0 177.66 L 180.0 177.70 L 181.0 177.73 L 182.0 177.76 L 183.0 177.79 L 184.0 177.82 L 185.0 177.84 L 186.0 177.86 L 187.0 177.87 L 188.0 177.89 L 189.0 177.90 L 190.0 177.91 L 191.0 177.92 L 192.0 177.93 L 193.0 177.94 L 194.0 177.95 L 195.0 177.95 L 196.0 177.96 L 197.0 177.96 L 198.0 177.97 L 199.0 177.97 L 200.0 177.98 L 201.0 177.98 L 202.0 177.98 L 203.0 177.98 L 204.0 177.98" fill="none" stroke="#9fb6d4" stroke-width="1.1" stroke-opacity="0.9"/>
+    <path d="M 96.0 120.04 L 97.0 120.04 L 98.0 120.05 L 99.0 120.05 L 100.0 120.06 L 101.0 120.07 L 102.0 120.08 L 103.0 120.09 L 104.0 120.10 L 105.0 120.11 L 106.0 120.13 L 107.0 120.14 L 108.0 120.16 L 109.0 120.18 L 110.0 120.21 L 111.0 120.24 L 112.0 120.27 L 113.0 120.30 L 114.0 120.34 L 115.0 120.39 L 116.0 120.44 L 117.0 120.50 L 118.0 120.56 L 119.0 120.64 L 120.0 120.72 L 121.0 120.82 L 122.0 120.92 L 123.0 121.04 L 124.0 121.18 L 125.0 121.33 L 126.0 121.51 L 127.0 121.70 L 128.0 121.92 L 129.0 122.16 L 130.0 122.44 L 131.0 122.75 L 132.0 123.10 L 133.0 123.49 L 134.0 123.92 L 135.0 124.40 L 136.0 124.94 L 137.0 125.53 L 138.0 126.19 L 139.0 126.91 L 140.0 127.71 L 141.0 128.59 L 142.0 129.54 L 143.0 130.58 L 144.0 131.71 L 145.0 132.92 L 146.0 134.21 L 147.0 135.60 L 148.0 137.06 L 149.0 138.61 L 150.0 140.22 L 151.0 141.90 L 152.0 143.63 L 153.0 145.39 L 154.0 147.19 L 155.0 149.00 L 156.0 150.81 L 157.0 152.61 L 158.0 154.37 L 159.0 156.10 L 160.0 157.78 L 161.0 159.39 L 162.0 160.94 L 163.0 162.40 L 164.0 163.79 L 165.0 165.08 L 166.0 166.29 L 167.0 167.42 L 168.0 168.46 L 169.0 169.41 L 170.0 170.29 L 171.0 171.09 L 172.0 171.81 L 173.0 172.47 L 174.0 173.06 L 175.0 173.60 L 176.0 174.08 L 177.0 174.51 L 178.0 174.90 L 179.0 175.25 L 180.0 175.56 L 181.0 175.84 L 182.0 176.08 L 183.0 176.30 L 184.0 176.49 L 185.0 176.67 L 186.0 176.82 L 187.0 176.96 L 188.0 177.08 L 189.0 177.18 L 190.0 177.28 L 191.0 177.36 L 192.0 177.44 L 193.0 177.50 L 194.0 177.56 L 195.0 177.61 L 196.0 177.66 L 197.0 177.70 L 198.0 177.73 L 199.0 177.76 L 200.0 177.79 L 201.0 177.82 L 202.0 177.84 L 203.0 177.86 L 204.0 177.87" fill="none" stroke="url(#gold)" stroke-width="1.6" filter="url(#glow)"/>
+    <g><circle cx="100.0" cy="120.06" r="1.05" fill="#f6dca0"/><circle cx="108.8" cy="120.18" r="1.05" fill="#f6dca0"/><circle cx="117.6" cy="120.54" r="1.05" fill="#f6dca0"/><circle cx="126.4" cy="121.58" r="1.05" fill="#f6dca0"/><circle cx="135.2" cy="124.50" r="1.05" fill="#f6dca0"/><circle cx="144.0" cy="131.71" r="1.05" fill="#f6dca0"/><circle cx="152.8" cy="145.04" r="1.05" fill="#f6dca0"/><circle cx="161.6" cy="160.33" r="1.05" fill="#f6dca0"/><circle cx="170.4" cy="170.62" r="1.05" fill="#f6dca0"/><circle cx="179.2" cy="175.31" r="1.05" fill="#f6dca0"/><circle cx="188.0" cy="177.08" r="1.05" fill="#f6dca0"/><circle cx="196.8" cy="177.69" r="1.05" fill="#f6dca0"/></g>
+    <g stroke="#f6dca0" stroke-width="0.7" fill="#f6dca0">
+      <line x1="139.5" y1="149.0" x2="153.5" y2="149.0"/>
+      <path d="M 153.8 149.0 l -2.4 -1.3 l 0 2.6 Z"/>
+    </g>
+
+    <!-- the temperature points -->
+    <g><circle cx="34.0" cy="189" r="1.55" fill="#4f8fd6"/><circle cx="46.0" cy="189" r="1.55" fill="#6b98c2"/><circle cx="58.0" cy="189" r="1.55" fill="#87a1af"/><circle cx="70.0" cy="189" r="1.55" fill="#a2aa9b"/><circle cx="82.0" cy="189" r="1.55" fill="#beb387"/><circle cx="94.0" cy="189" r="1.55" fill="#dabc74"/><circle cx="106.0" cy="189" r="1.55" fill="#e7b665"/><circle cx="118.0" cy="189" r="1.55" fill="#e6a35a"/><circle cx="130.0" cy="189" r="1.55" fill="#e48f4f"/><circle cx="142.0" cy="189" r="1.55" fill="#e37c44"/><circle cx="154.0" cy="189" r="1.55" fill="#e1683a"/><circle cx="166.0" cy="189" r="1.55" fill="#e0552f"/></g>
+
+    <text x="100" y="206" text-anchor="middle" fill="#8b949e" font-family="Georgia, 'Times New Roman', serif"
+          font-size="4.6" letter-spacing="1.6">· THERMAL · PROTEOME · PROFILING ·</text>
+    <text x="100" y="230" text-anchor="middle" fill="#c49c6e" font-family="Georgia, 'Times New Roman', serif"
+          font-size="19" letter-spacing="3.4">OLYMPUS</text>
+  </g>
+  <rect x="2" y="2" width="196" height="236" rx="16" fill="none" stroke="#3c6082" stroke-opacity=".7"/>
+</svg>

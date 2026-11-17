@@ -1,9 +1,9 @@
-"""Command line: ``fctpp <command>`` (or ``python -m fctpp <command>``).
+"""Command line: ``olympus <command>`` (or ``python -m olympus <command>``).
 
-  fctpp init-config [-o fctpp_config.yaml]
-  fctpp analyze --deimos-root deimos_results -o fctpp_output
-  fctpp analyze --manifest runs.csv -o fctpp_output
-  fctpp analyze --long-table TPP_results.xlsx --sheet TPP_data --rule r_legacy
+  olympus init-config [-o olympus_config.yaml]
+  olympus analyze --deimos-root deimos_results -o olympus_output
+  olympus analyze --manifest runs.csv -o olympus_output
+  olympus analyze --long-table TPP_results.xlsx --sheet TPP_data --rule r_legacy
 
 Input = the X Deimos result workbooks (one per temperature). Every option can
 live in the YAML (``--config``); CLI values win.
@@ -19,17 +19,17 @@ from pathlib import Path
 from . import __version__
 from .config import load_config, parse_override, set_dotted
 
-log = logging.getLogger("fctpp")
+log = logging.getLogger("olympus")
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="fctpp", description="FC.TPP — fold-change Thermal Proteome "
+    ap = argparse.ArgumentParser(prog="olympus", description="Olympus — fold-change Thermal Proteome "
                                  "Profiling on the per-temperature Deimos result workbooks.")
-    ap.add_argument("--version", action="version", version=f"fctpp {__version__}")
+    ap.add_argument("--version", action="version", version=f"olympus {__version__}")
     sub = ap.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("init-config", help="write an annotated YAML template")
-    p.add_argument("-o", "--output", default="fctpp_config.yaml")
+    p.add_argument("-o", "--output", default="olympus_config.yaml")
 
     p = sub.add_parser("analyze", help="TPP calls, Excel report and figures")
     p.add_argument("-c", "--config", help="YAML configuration file")

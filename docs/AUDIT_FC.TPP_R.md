@@ -1,6 +1,6 @@
 # Audit du code R — FC.TPP et `rDEP_Version_Definitive_20625.R`
 
-**Date :** 27/09/2026
+**Date :** 27/09/2026 — la version Python, d'abord appelée `fctpp`, a été renommée **Olympus** le 17/11/2026.
 
 **Périmètre :**
 - package R `FC.TPP` 0.0.0.9000 (archive `FC.TPP.zip`, index git sans commit) ;
@@ -18,11 +18,11 @@ Pas de R disponible dans l'environnement : les constats sur DEP sont vérifiés 
 
 ## 1. Synthèse
 
-| # | Sévérité | Constat | Dans la version Python |
+| # | Sévérité | Constat | Dans la version Python (Olympus) |
 |---|---|---|---|
 | A1 | Élevée | Appariement échantillons ↔ design par effet de bord (`delete_prefix` de DEP) | Fait en amont par Deimos : un design par température, appariement exact des labels |
 | A2 | Élevée | « 2 températures consécutives » = 2 *lignes successives* : trous et inversions de signe acceptés | Règle `strict` par défaut ; `r_legacy` pour reproduire R |
-| A3 | Élevée | `p.adj` de DEP = q-value fdrtool, **inférieure à p.val dans 29 à 47 % des lignes** | Deimos : BH ; FC.TPP utilise `p.val` (comme R) ou `p.adj` BH au choix |
+| A3 | Élevée | `p.adj` de DEP = q-value fdrtool, **inférieure à p.val dans 29 à 47 % des lignes** | Deimos : BH ; Olympus utilise `p.val` (comme R) ou `p.adj` BH au choix |
 | A4 | Élevée | Aucun contrôle de multiplicité entre températures × contrastes | Documenté ; règle stricte ; pistes de calibration |
 | A5 | Élevée | Imputation MinProb non seedée et déterminante pour certains appels | Drapeau `imputed_in_run` ; imputation déléguée à Deimos (QRILC, seed) |
 | A6 | Moyenne à élevée | Abondance et stabilité confondues (aucune référence basse température) | Drapeau `shift_class = abundance-like` |
@@ -51,7 +51,7 @@ Rien n'est rapporté à l'utilisateur.
 
 *Vérification.* La même logique, réimplémentée explicitement, redonne exactement les présences R. Sur les 12 températures, T1 s'apparie en exact et T2 à T12 par suffixe.
 
-*Dans la nouvelle chaîne.* L'appariement se fait dans Deimos, qui exige un design par température avec les labels exacts de cette température (`Sple-2B` à T2, etc.) et arrête le run si un label manque. Le problème disparaît donc, à condition de fournir X designs cohérents : même ordre des conditions et même contrôle partout. FC.TPP vérifie ensuite que les X classeurs exposent les mêmes contrastes.
+*Dans la nouvelle chaîne.* L'appariement se fait dans Deimos, qui exige un design par température avec les labels exacts de cette température (`Sple-2B` à T2, etc.) et arrête le run si un label manque. Le problème disparaît donc, à condition de fournir X designs cohérents : même ordre des conditions et même contrôle partout. Olympus vérifie ensuite que les X classeurs exposent les mêmes contrastes.
 
 ### A2. Règle des températures consécutives (`tidy_tpp`, l. 989-1000)
 
@@ -96,7 +96,7 @@ Conséquences :
 - **FC.TPP.** Les appels utilisent `p.val`, donc les résultats TPP ne sont pas touchés. En revanche, les docstrings de `magma()` et de `tidy_tpp()` annoncent une p-value ajustée.
 - **rDEP.** `add_rejections(alpha = 0.05, lfc = log2(1.2))` construit la colonne `significant` sur ces q-values. **Les listes « significatives » produites par rDEP sont probablement très optimistes.** Il faut les revoir si elles ont servi à des interprétations.
 
-*Python.* Deimos fournit une correction BH par contraste. FC.TPP garde `p.val` par défaut pour la parité, et `call.p_column: p.adj` permet d'appeler sur BH.
+*Python.* Deimos fournit une correction BH par contraste. Olympus garde `p.val` par défaut pour la parité, et `call.p_column: p.adj` permet d'appeler sur BH.
 
 ### A4. Multiplicité
 
@@ -206,13 +206,13 @@ Problèmes de l'enrichissement GO (topGO) :
 
 ---
 
-## 4. Validation de la version Python
+## 4. Validation de la version Python (Olympus)
 
 | Contrôle | Résultat |
 |---|---|
 | Appels (`r_legacy`) sur `TPP_data` R | 23 792 lignes, 3 contrastes : `_logpval` et `_threshold` **identiques** |
 | Statistiques de présence recalculées depuis les `T*.tsv` bruts | 2 215 protéines : `nb_temp` et `max_consecutive` **identiques** ; 2 041 retenues (idem R) |
-| 12 runs Deimos (un par température) puis `fctpp analyze` sur les 12 classeurs | 12/12 runs OK (~30 s chacun) ; mêmes 2 041 protéines retenues |
+| 12 runs Deimos (un par température) puis `olympus analyze` sur les 12 classeurs | 12/12 runs OK (~30 s chacun) ; mêmes 2 041 protéines retenues |
 | log2FC Deimos vs DEP, lignes sans imputation | identiques (écart max 2 × 10⁻¹⁴) |
 | Hits | Les 2 hits R retrouvés + 1 hit supplémentaire signalé comme douteux (`imputed_in_run`, absent à T1) |
 | Tests | 70 tests (synthétiques + CLI) ; `-m realdata` et `-m deimos` sur les données réelles |
@@ -224,5 +224,5 @@ Problèmes de l'enrichissement GO (topGO) :
 1. **Deimos, `load_data`** : `tsv.columns[:6]` suppose 6 colonnes d'annotation. Un export DIA-NN ancien (4 colonnes) fait basculer 2 runs en annotations ; le diagnostic des labels s'arrête alors avec un message trompeur. Détecter plutôt les colonnes numériques. En attendant, exporter les matrices TPP avec DIA-NN ≥ 2 (6 colonnes d'annotation).
 2. **Deimos, regex `Sple-[^_]+`** codée en dur (diagnostic et chargement) : à passer en paramètre YAML.
 3. **Deimos, seed** : les correctifs du 22/09 (seed, QRILC par régression quantile, `impute_method: auto`) ne sont pas dans le commit GitHub `4d49d24` utilisé ici. *Mise à jour du 17/11 :* le seed est dans `main` (`e160463`, `seed: 42` par défaut). Restent ouverts les points 1 et 2.
-4. **Deimos en mode TPP** : éviter `impute_method: auto`, qui peut choisir une méthode différente selon la température. Fixer la même méthode pour les X runs ; `fctpp analyze` vérifie l'homogénéité dans les feuilles `Methods` et la signale sinon.
+4. **Deimos en mode TPP** : éviter `impute_method: auto`, qui peut choisir une méthode différente selon la température. Fixer la même méthode pour les X runs ; `olympus analyze` vérifie l'homogénéité dans les feuilles `Methods` et la signale sinon.
 5. **rDEP** : revoir toute liste de protéines « significatives » produite avec `add_rejections` (cf. A3).

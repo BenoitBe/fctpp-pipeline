@@ -1,22 +1,30 @@
-# FC.TPP — fold-change Thermal Proteome Profiling (Python)
+<p align="center">
+  <img src="olympus_icon.svg" width="90" alt="Olympus">
+</p>
 
-Python port of the R package **FC.TPP**. Thermal-shift candidates are called from
+# Olympus — fold-change Thermal Proteome Profiling
+
+[![tests](https://github.com/BenoitBe/olympus-tpp-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/BenoitBe/olympus-tpp-pipeline/actions/workflows/tests.yml)
+
+Python port of the R package **FC.TPP**, named after Olympus Mons, the largest volcano
+of the solar system: a nod to the temperature series, and its flank has the shape of
+a melting curve (see the icon). Thermal-shift candidates are called from
 per-temperature fold changes and p-values: a protein is a hit when it passes
 |log2FC| and p-value thresholds at **several adjacent temperatures** with the same
 direction.
 
-FC.TPP starts from the **X result workbooks produced by
+Olympus starts from the **X result workbooks produced by
 [Deimos](https://github.com/BenoitBe/deimos-proteomics-pipeline)**, one Deimos run
 per temperature point (X = number of temperatures, any value). Deimos does the
-per-temperature statistics (filtering, imputation, limma/eBayes); FC.TPP only
+per-temperature statistics (filtering, imputation, limma/eBayes); Olympus only
 contains the TPP layer, so the platform keeps a single statistical engine.
 
 ```
 Deimos × X (one run per temperature, run as usual)
    T1/ProteomicAnalysis_Results.xlsx … TX/ProteomicAnalysis_Results.xlsx
-                         │  fctpp analyze
+                         │  olympus analyze
                          ▼
-   FCTPP_Results.xlsx · volcano_plots.pdf · TPP_plots.pdf · <contrast>_plot3D.html
+   Olympus_Results.xlsx · volcano_plots.pdf · TPP_plots.pdf · <contrast>_plot3D.html
 ```
 
 ---
@@ -24,8 +32,8 @@ Deimos × X (one run per temperature, run as usual)
 ## Installation
 
 ```bash
-git clone https://github.com/BenoitBe/fctpp-pipeline.git
-cd fctpp-pipeline
+git clone https://github.com/BenoitBe/olympus-tpp-pipeline.git
+cd olympus-tpp-pipeline
 pip install -e .            # or: pip install -r requirements.txt && pip install -e .
 pip install adjustText      # optional: non-overlapping labels on volcano plots
 ```
@@ -38,16 +46,16 @@ Python ≥ 3.10. Deimos is not a dependency: only its result workbooks are read
 ## Quick start
 
 ```bash
-fctpp analyze --deimos-root deimos_results -o fctpp_output
-fctpp analyze --deimos-root deimos_results --celsius temperatures.csv -o fctpp_output
-fctpp init-config -o fctpp_config.yaml && fctpp analyze -c fctpp_config.yaml   # YAML
+olympus analyze --deimos-root deimos_results -o olympus_output
+olympus analyze --deimos-root deimos_results --celsius temperatures.csv -o olympus_output
+olympus init-config -o olympus_config.yaml && olympus analyze -c olympus_config.yaml   # YAML
 ```
 
 Try it without data:
 
 ```bash
 python example_data/make_synthetic.py            # 12 Deimos-like workbooks with planted shifts
-fctpp analyze --deimos-root example_data/deimos_results --celsius example_data/temperatures.csv -o example_output
+olympus analyze --deimos-root example_data/deimos_results --celsius example_data/temperatures.csv -o example_output
 ```
 
 ---
@@ -74,9 +82,9 @@ deimos_results/T1_ProteomicAnalysis_Results.xlsx                  # renamed copi
   < T10). You can also give their values in °C (`--celsius`, CSV
   `temperature,celsius`); they are then used for ordering and axes.
 
-**Checklist for the X Deimos runs** (checked by FC.TPP, with a warning if not met):
+**Checklist for the X Deimos runs** (checked by Olympus, with a warning if not met):
 
-| Point | Why | What FC.TPP does |
+| Point | Why | What Olympus does |
 |---|---|---|
 | Same condition order and same control at every temperature (e.g. `control_condition: Ctl`) | identical contrast names | a contrast reversed at one temperature is flipped back |
 | Same processing: explicit `impute_method` (not `auto`, the Deimos default), same FDR mode | comparable temperatures | differences reported in `Methods` |
@@ -119,11 +127,11 @@ deimos_results/T1_ProteomicAnalysis_Results.xlsx                  # renamed copi
 
 ---
 
-## Outputs (`fctpp_output/`)
+## Outputs (`olympus_output/`)
 
 | File | Content |
 |---|---|
-| `FCTPP_Results.xlsx` | Sheets:<br>• `Methods`, `Summary`<br>• `Hits`, `TPP_data` (R layout), `Stats_proteins`, `Calls`<br>• `FC_<contrast>` / `logP_<contrast>`: protein × temperature matrices<br>• `Inputs`: path, SHA-256 and Deimos parameters for each temperature<br>• `Deimos_Methods`, `Temperatures`, `Parameters` |
+| `Olympus_Results.xlsx` | Sheets:<br>• `Methods`, `Summary`<br>• `Hits`, `TPP_data` (R layout), `Stats_proteins`, `Calls`<br>• `FC_<contrast>` / `logP_<contrast>`: protein × temperature matrices<br>• `Inputs`: path, SHA-256 and Deimos parameters for each temperature<br>• `Deimos_Methods`, `Temperatures`, `Parameters` |
 | `TPP_data.csv`, `TPP_hits.csv` | Same tables, flat. |
 | `volcano_plots.pdf` | One page per contrast, one panel per temperature (`volcano_layout: pages` gives the R layout). Hits are circled. |
 | `TPP_plots.pdf` | FC and -log10 p profiles: all proteins in grey with hits highlighted, then one panel per hit. |
@@ -141,14 +149,14 @@ Consistency checks on the inputs:
 
 ## From the R package
 
-| R (FC.TPP) | Python |
+| R (FC.TPP) | Python (Olympus) |
 |---|---|
 | `process_tsv`, `format_tsv`, `find_design`, `sumXP`, `process_and_export` (DEP: filter, MinProb, limma, fdrtool) | **Deimos**, one run per temperature (outside this package) |
 | — | `inputs.discover_deimos_runs` / `load_deimos_runs`: reading the X workbooks |
 | `tidy_tpp` | `tpp.run_tpp` (`rule: r_legacy` = identical calls) |
 | `magma` | `plots.volcano_pdf` |
 | `plot_and_3D` (ggplot2, plotly, webshot2, magick) | `plots.profiles_pdf`, `plot3d.plot3d_html`, `plot3d.rotation_gif` |
-| `TPP_results.xlsx` (overwritten by each function) | `FCTPP_Results.xlsx`, written once |
+| `TPP_results.xlsx` (overwritten by each function) | `Olympus_Results.xlsx`, written once |
 
 The R audit, with the list of changes and their justification, is in
 [`docs/AUDIT_FC.TPP_R.md`](docs/AUDIT_FC.TPP_R.md) (in French).
@@ -173,8 +181,8 @@ On the 12-temperature *S. aureus* dataset of the R project:
 
 ```bash
 pytest                                        # unit + CLI tests on synthetic data
-FCTPP_R_PROJECT=/path/FC.TPP pytest -m realdata               # parity with the R outputs
-FCTPP_DEIMOS_RESULTS=/path/deimos_results FCTPP_R_PROJECT=/path/FC.TPP pytest -m deimos   # real Deimos outputs
+OLYMPUS_R_PROJECT=/path/FC.TPP pytest -m realdata               # parity with the R outputs
+OLYMPUS_DEIMOS_RESULTS=/path/deimos_results OLYMPUS_R_PROJECT=/path/FC.TPP pytest -m deimos   # real Deimos outputs
 ```
 
 Real data are not versioned. The two marked suites are skipped when their variables
@@ -199,7 +207,7 @@ are not set.
 | Tool | Role |
 |---|---|
 | [Deimos](https://github.com/BenoitBe/deimos-proteomics-pipeline) | DIA quantitative pipeline (per-temperature statistics) |
-| **FC.TPP** (this repo) | Thermal proteome profiling on top of Deimos |
+| **Olympus** (this repo) | Thermal proteome profiling on top of Deimos (formerly FC.TPP, R) |
 | [Phobos](https://github.com/BenoitBe/phobos-peptidomics-pipeline) | DDA/PEAKS peptidomics |
 | [Pathfinder](https://github.com/BenoitBe/Pathfinder) | Cross-run synthesis |
 

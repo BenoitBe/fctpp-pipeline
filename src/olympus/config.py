@@ -52,8 +52,8 @@ DEFAULTS: dict[str, Any] = {
         "label_column": "Genes",
     },
     "output": {
-        "out_dir": "fctpp_output",
-        "excel": "FCTPP_Results.xlsx",
+        "out_dir": "olympus_output",
+        "excel": "Olympus_Results.xlsx",
         "csv": True,
     },
 }

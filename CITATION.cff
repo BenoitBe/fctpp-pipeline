@@ -1,10 +1,10 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "FC.TPP: fold-change based Thermal Proteome Profiling (Python)"
+title: "Olympus: fold-change based Thermal Proteome Profiling (Python port of FC.TPP)"
 version: 0.1.0
 date-released: 2026-09-27
 license: Artistic-2.0
-repository-code: "https://github.com/BenoitBe/fctpp-pipeline"
+repository-code: "https://github.com/BenoitBe/olympus-tpp-pipeline"
 authors:
   - family-names: Bernay
     given-names: Benoit

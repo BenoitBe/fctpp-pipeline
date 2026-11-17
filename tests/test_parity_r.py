@@ -1,6 +1,6 @@
-"""Parity with the R package on its own outputs (needs the FC.TPP R project).
+"""Parity with the R package on its own outputs (needs the R FC.TPP project).
 
-    FCTPP_R_PROJECT=/path/to/FC.TPP pytest -m realdata
+    OLYMPUS_R_PROJECT=/path/to/FC.TPP pytest -m realdata
 
 1. Call logic: the R ``TPP_data`` sheet re-analysed with ``rule=r_legacy`` gives
    identical ``_logpval`` and ``_threshold`` columns.
@@ -17,9 +17,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fctpp.inputs import load_long_table
-from fctpp.temperatures import TemperatureSeries, natural_key
-from fctpp.tpp import CallParams, presence_stats, run_tpp
+from olympus.inputs import load_long_table
+from olympus.temperatures import TemperatureSeries, natural_key
+from olympus.tpp import CallParams, presence_stats, run_tpp
 
 pytestmark = pytest.mark.realdata
 

@@ -4,10 +4,10 @@ import openpyxl
 import pandas as pd
 import pytest
 
-from fctpp.cli import main
-from fctpp.inputs import (discover_deimos_runs, harmonise_contrasts, load_deimos_runs,
+from olympus.cli import main
+from olympus.inputs import (discover_deimos_runs, harmonise_contrasts, load_deimos_runs,
                           load_long_table, read_manifest)
-from fctpp.synthetic import CELSIUS, make_deimos_like_runs
+from olympus.synthetic import CELSIUS, make_deimos_like_runs
 
 
 def test_discover_and_load(deimos_root):
@@ -88,10 +88,10 @@ def test_cli_analyze_end_to_end(deimos_root, tmp_path):
     code = main(["analyze", "--deimos-root", str(deimos_root), "-o", str(out), "--celsius", str(cel),
                  "--set", "plots.gif=true", "--set", "plots.plotly_js=cdn"])
     assert code == 0
-    for f in ["FCTPP_Results.xlsx", "TPP_data.csv", "TPP_hits.csv", "volcano_plots.pdf",
+    for f in ["Olympus_Results.xlsx", "TPP_data.csv", "TPP_hits.csv", "volcano_plots.pdf",
               "TPP_plots.pdf", "C1_vs_Ctl_plot3D.html", "C1_vs_Ctl_rotation.gif", "last_config.yaml"]:
         assert (out / f).exists(), f
-    wb = openpyxl.load_workbook(out / "FCTPP_Results.xlsx", read_only=True)
+    wb = openpyxl.load_workbook(out / "Olympus_Results.xlsx", read_only=True)
     for s in ["Methods", "Summary", "Hits", "TPP_data", "Stats_proteins", "Calls",
               "FC_C1_vs_Ctl", "logP_C1_vs_Ctl", "Inputs", "Temperatures"]:
         assert s in wb.sheetnames, s
@@ -124,7 +124,7 @@ def test_cli_small_series_with_fractions(tmp_path):
 def test_init_config(tmp_path):
     p = tmp_path / "cfg.yaml"
     assert main(["init-config", "-o", str(p)]) == 0
-    from fctpp.config import load_config
+    from olympus.config import load_config
     cfg = load_config(p)
     assert cfg["call"]["rule"] == "strict"
     assert cfg["input"]["workbook_glob"] == "**/*ProteomicAnalysis_Results*.xlsx"

@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fctpp.inputs import discover_deimos_runs, load_deimos_runs
-from fctpp.temperatures import TemperatureSeries
-from fctpp.tpp import (CallParams, FilterParams, call_protein, detect_contrasts, longest_run,
+from olympus.inputs import discover_deimos_runs, load_deimos_runs
+from olympus.temperatures import TemperatureSeries
+from olympus.tpp import (CallParams, FilterParams, call_protein, detect_contrasts, longest_run,
                        presence_stats, run_tpp)
 
 
@@ -150,7 +150,7 @@ def test_presence_stats_uses_series_adjacency():
 # --------------------------------------------------------------------------- temperatures / X
 
 def test_natural_sort_and_celsius_order():
-    from fctpp.temperatures import natural_sorted
+    from olympus.temperatures import natural_sorted
     assert natural_sorted(["T10", "T2", "T1", "T12"]) == ["T1", "T2", "T10", "T12"]
     ts = TemperatureSeries.from_ids(["a", "b", "c"], {"a": 50, "b": 37, "c": 44})
     assert ts.ids == ("b", "c", "a") and ts.reference == "b"

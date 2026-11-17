@@ -1,6 +1,6 @@
 """Real Deimos result workbooks vs the R package (slow; needs both folders).
 
-    FCTPP_DEIMOS_RESULTS=/path/deimos_results FCTPP_R_PROJECT=/path/FC.TPP pytest -m deimos
+    OLYMPUS_DEIMOS_RESULTS=/path/deimos_results OLYMPUS_R_PROJECT=/path/FC.TPP pytest -m deimos
 
 For proteins without imputed values, the Deimos log2FC must equal those of the
 R/DEP pipeline (same log2 intensities, same ~0 + condition limma model), and the
@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fctpp.cli import main
+from olympus.cli import main
 
 pytestmark = pytest.mark.deimos
 
