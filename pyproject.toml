@@ -3,9 +3,9 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fctpp"
+name = "olympus-tpp"
 dynamic = ["version"]
-description = "FC.TPP — fold-change based Thermal Proteome Profiling on per-temperature Deimos results"
+description = "Olympus — fold-change Thermal Proteome Profiling on per-temperature Deimos results (Python port of FC.TPP)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Artistic-2.0" }
@@ -34,26 +34,26 @@ labels = ["adjustText>=0.8"]
 dev = ["pytest>=7", "adjustText>=0.8"]
 
 [project.scripts]
-fctpp = "fctpp.cli:main"
+olympus = "olympus.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/BenoitBe/fctpp-pipeline"
+Homepage = "https://github.com/BenoitBe/olympus-tpp-pipeline"
 Deimos = "https://github.com/BenoitBe/deimos-proteomics-pipeline"
 
 [tool.setuptools.dynamic]
-version = { attr = "fctpp.__version__" }
+version = { attr = "olympus.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-fctpp = ["config_template.yaml"]
+olympus = ["config_template.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 markers = [
-  "realdata: needs the FC.TPP R project folder (set FCTPP_R_PROJECT)",
-  "deimos: needs real Deimos result workbooks (set FCTPP_DEIMOS_RESULTS); slow",
+  "realdata: needs the R FC.TPP project folder (set OLYMPUS_R_PROJECT)",
+  "deimos: needs real Deimos result workbooks (set OLYMPUS_DEIMOS_RESULTS); slow",
 ]
 filterwarnings = ["ignore::DeprecationWarning"]

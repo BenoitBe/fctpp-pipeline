@@ -61,10 +61,10 @@ def methods_table(res: TPPResult, run_info: dict) -> pd.DataFrame:
     rule = ("strict: >= {k} ADJACENT temperatures of the series, all with |log2FC| >= {fc} and "
             "-log10({p}) >= {lp}, with the SAME sign of fold change"
             if cp.rule == "strict" else
-            "r_legacy (FC.TPP R): two SUCCESSIVE rows of the protein (temperature order, gaps "
+            "r_legacy (R FC.TPP): two SUCCESSIVE rows of the protein (temperature order, gaps "
             "allowed) with |log2FC| >= {fc} and -log10({p}) >= {lp}; sign not checked")
     rows = [
-        ("Tool", f"FC.TPP (Python) {__version__}", ""),
+        ("Tool", f"Olympus {__version__}", ""),
         ("Run date", datetime.now().strftime("%Y-%m-%d %H:%M"), ""),
         ("Python", platform.python_version(), f"pandas {pd.__version__}"),
         ("Input mode", run_info.get("input_mode", ""), run_info.get("input", "")),
@@ -121,7 +121,7 @@ def write_workbook(res: TPPResult, out_path: str | Path, *, run_info: dict | Non
         sheets.append(("Deimos_Methods", methods_upstream))
     sheets.append(("Temperatures", res.temperatures.to_frame()))
     sheets.append(("Parameters", pd.DataFrame(
-        [("fctpp_params", json.dumps(run_info.get("config", res.params_dict()), default=str, indent=1))],
+        [("olympus_params", json.dumps(run_info.get("config", res.params_dict()), default=str, indent=1))],
         columns=["key", "value"])))
 
     with pd.ExcelWriter(out_path, engine="openpyxl") as xw:

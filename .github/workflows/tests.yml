@@ -34,9 +34,9 @@ jobs:
       - name: Smoke test on the example dataset
         run: |
           python example_data/make_synthetic.py
-          fctpp analyze --deimos-root example_data/deimos_results \
+          olympus analyze --deimos-root example_data/deimos_results \
                         --celsius example_data/temperatures.csv -o /tmp/smoke
-          test -f /tmp/smoke/FCTPP_Results.xlsx
+          test -f /tmp/smoke/Olympus_Results.xlsx
           test -f /tmp/smoke/volcano_plots.pdf
           test -f /tmp/smoke/TPP_plots.pdf
           test -f /tmp/smoke/C1_vs_Ctl_plot3D.html

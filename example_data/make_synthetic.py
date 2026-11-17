@@ -1,19 +1,19 @@
 """Build a synthetic example next to this script.
 
     python example_data/make_synthetic.py
-    fctpp analyze --deimos-root example_data/deimos_results \
+    olympus analyze --deimos-root example_data/deimos_results \
                   --celsius example_data/temperatures.csv -o example_output
 
 Writes 12 Deimos-like result workbooks (Differential_Expression + Methods
 sheets), one per temperature, with planted thermal shifts (see
-fctpp/synthetic.py for the list), and a temperature → °C mapping.
+olympus/synthetic.py for the list), and a temperature → °C mapping.
 """
 
 from pathlib import Path
 
 import pandas as pd
 
-from fctpp.synthetic import CELSIUS, make_deimos_like_runs
+from olympus.synthetic import CELSIUS, make_deimos_like_runs
 
 here = Path(__file__).resolve().parent
 make_deimos_like_runs(here / "deimos_results")

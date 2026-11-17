@@ -1,12 +1,12 @@
 # ==============================================================================
-# FC.TPP — fold-change Thermal Proteome Profiling (Python)
+# Olympus — fold-change Thermal Proteome Profiling (Python port of FC.TPP)
 # Annotated configuration. CLI options always override this file.
-#   fctpp analyze --config fctpp_config.yaml
-#   fctpp analyze --config fctpp_config.yaml --set call.rule=r_legacy
+#   olympus analyze --config olympus_config.yaml
+#   olympus analyze --config olympus_config.yaml --set call.rule=r_legacy
 # ==============================================================================
 
 # ── 1. Inputs: the X Deimos result workbooks (one Deimos run per temperature) ─
-# Checklist for the X Deimos runs (FC.TPP checks it and warns):
+# Checklist for the X Deimos runs (Olympus checks it and warns):
 #   - same design order and same control (control_condition) at every temperature
 #     -> identical contrast names (a reversed contrast is flipped back automatically)
 #   - same processing everywhere (impute_method explicit, not 'auto'; same FDR mode)
@@ -63,6 +63,6 @@ plots:
 
 # ── 5. Outputs ───────────────────────────────────────────────────────────────
 output:
-  out_dir: fctpp_output
-  excel: FCTPP_Results.xlsx
+  out_dir: olympus_output
+  excel: Olympus_Results.xlsx
   csv: true

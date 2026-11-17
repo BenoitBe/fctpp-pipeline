@@ -1,12 +1,12 @@
-# FC.TPP outputs
-fctpp_output*/
+# Olympus outputs
+olympus_output*/
 example_output*/
 deimos_results/
 example_data/deimos_results/
 example_data/temperatures.csv
 *_plot3D.html
 *_rotation.gif
-FCTPP_Results*.xlsx
+Olympus_Results*.xlsx
 last_config.yaml
 
 # Real data are not versioned (unpublished)
