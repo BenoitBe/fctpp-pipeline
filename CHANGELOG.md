@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Changed
+- **License: MIT** (was Artistic-2.0, inherited from the R package FC.TPP), like the
+  other tools of the suite (Deimos, Pathfinder). `LICENSE`, `pyproject.toml` and
+  `CITATION.cff` updated.
 - **Renamed FC.TPP (Python) → Olympus**, after Olympus Mons. Package `olympus`
   (pip distribution `olympus-tpp`), command `olympus analyze`, results workbook
   `Olympus_Results.xlsx`, default output folder `olympus_output`, test variables

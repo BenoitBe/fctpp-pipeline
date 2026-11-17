@@ -214,6 +214,9 @@ are not set.
 ## Authors and license
 
 Benoit Bernay, Anthony Sleiman, Alexandre Mahé, with contributions from Aurélie
-Budin-Verneuil (Université de Caen Normandie; funded by Région Normandie). Authors
-and license are those of the R package: Artistic License 2.0, see [LICENSE](LICENSE).
+Budin-Verneuil (Université de Caen Normandie; funded by Région Normandie).
+
+Olympus is released under the MIT License, see [LICENSE](LICENSE). It is a Python
+port of the R package FC.TPP by the same authors, which is released under the
+Artistic License 2.0.
 See [CITATION.cff](CITATION.cff) to cite the software.
