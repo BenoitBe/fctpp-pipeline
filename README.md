@@ -31,7 +31,7 @@ pip install adjustText      # optional: non-overlapping labels on volcano plots
 ```
 
 Python ≥ 3.10. Deimos is not a dependency: only its result workbooks are read
-(tested with Deimos commit `4d49d24`).
+(tested with Deimos commits `4d49d24`, 27/09/2026, and `e160463`, 17/11/2026).
 
 ---
 
@@ -79,7 +79,8 @@ deimos_results/T1_ProteomicAnalysis_Results.xlsx                  # renamed copi
 | Point | Why | What FC.TPP does |
 |---|---|---|
 | Same condition order and same control at every temperature (e.g. `control_condition: Ctl`) | identical contrast names | a contrast reversed at one temperature is flipped back |
-| Same processing: explicit `impute_method` (not `auto`), same FDR mode | comparable temperatures | differences reported in `Methods` |
+| Same processing: explicit `impute_method` (not `auto`, the Deimos default), same FDR mode | comparable temperatures | differences reported in `Methods` |
+| Same primary statistic: a `report.pr_matrix.tsv` for **every** temperature or for none | Deimos uses `primary_statistic: dpc` (imputation-free) only when it finds a usable pr_matrix, and falls back to imputation otherwise | a mix of DPC and imputation is reported in `Methods` |
 | One design per temperature, with that temperature's labels (`Sple-1B` at T1, `Sple-2B` at T2…) | exact label matching in Deimos | — |
 | DIA-NN matrices with **6 annotation columns** (DIA-NN ≥ 2) | Deimos reads `columns[:6]` as annotations; an old export with 4 columns makes Deimos stop, reporting two samples as missing | — |
 

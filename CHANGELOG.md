@@ -1,5 +1,15 @@
 # Changelog — FC.TPP (Python)
 
+## [Unreleased]
+
+### Checked
+- Compatibility with Deimos `main` `e160463` (17/11/2026): 12 TPP temperatures
+  rerun, same workbook layout read, same results (2,041 proteins, same 3 hits and
+  flags); `-m realdata` and `-m deimos` suites pass; every module compiles on
+  Python 3.11.
+- Documented the Deimos `primary_statistic: dpc` default: one pr_matrix for every
+  temperature or for none, so that the X runs use the same statistic.
+
 ## [0.1.0] — 2026-09-27
 
 First Python release. Port of the R package FC.TPP (0.0.0.9000, 2025), with the

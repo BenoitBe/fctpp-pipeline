@@ -10,6 +10,8 @@
 #   - same design order and same control (control_condition) at every temperature
 #     -> identical contrast names (a reversed contrast is flipped back automatically)
 #   - same processing everywhere (impute_method explicit, not 'auto'; same FDR mode)
+#   - same primary statistic: a report.pr_matrix.tsv for every temperature or for none
+#     (Deimos 'dpc' falls back to imputation when the pr_matrix is missing)
 input:
   mode: deimos                       # deimos | long-table
   deimos_root: deimos_results        # accepted layouts:

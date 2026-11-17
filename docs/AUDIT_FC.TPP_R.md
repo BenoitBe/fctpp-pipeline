@@ -10,7 +10,7 @@
 1. Lecture du code.
 2. Réimplémentation Python, puis comparaison avec les sorties R livrées (`TPP_results.xlsx`).
 3. Recalcul depuis les `T*.tsv` bruts.
-4. Exécution réelle de Deimos (commit `4d49d24`) sur les 12 températures.
+4. Exécution réelle de Deimos (commit `4d49d24`) sur les 12 températures, refaite le 17/11/2026 avec `e160463` : mêmes résultats.
 
 Pas de R disponible dans l'environnement : les constats sur DEP sont vérifiés sur les sorties R existantes.
 
@@ -223,6 +223,6 @@ Problèmes de l'enrichissement GO (topGO) :
 
 1. **Deimos, `load_data`** : `tsv.columns[:6]` suppose 6 colonnes d'annotation. Un export DIA-NN ancien (4 colonnes) fait basculer 2 runs en annotations ; le diagnostic des labels s'arrête alors avec un message trompeur. Détecter plutôt les colonnes numériques. En attendant, exporter les matrices TPP avec DIA-NN ≥ 2 (6 colonnes d'annotation).
 2. **Deimos, regex `Sple-[^_]+`** codée en dur (diagnostic et chargement) : à passer en paramètre YAML.
-3. **Deimos, seed** : les correctifs du 22/09 (seed, QRILC par régression quantile, `impute_method: auto`) ne sont pas dans le commit GitHub `4d49d24` utilisé ici. À pousser.
+3. **Deimos, seed** : les correctifs du 22/09 (seed, QRILC par régression quantile, `impute_method: auto`) ne sont pas dans le commit GitHub `4d49d24` utilisé ici. *Mise à jour du 17/11 :* le seed est dans `main` (`e160463`, `seed: 42` par défaut). Restent ouverts les points 1 et 2.
 4. **Deimos en mode TPP** : éviter `impute_method: auto`, qui peut choisir une méthode différente selon la température. Fixer la même méthode pour les X runs ; `fctpp analyze` vérifie l'homogénéité dans les feuilles `Methods` et la signale sinon.
 5. **rDEP** : revoir toute liste de protéines « significatives » produite avec `add_rejections` (cf. A3).
